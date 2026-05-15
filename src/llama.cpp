@@ -284,6 +284,9 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             case 3: split_other = SPLIT_OTHER_ALL_CPU; break;
             default: break;
         }
+        if (ffn_mode == FFN_LOCAL) {
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (ffn_split_mode=%d)\n", __func__, params.ffn_split_mode);
+        }
         {
             const char * env = getenv("LLAMA_SPLIT_OTHER");
             if (env) {

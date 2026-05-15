@@ -11,10 +11,6 @@
 
 #define DEFAULT_INTERPOLATION_MODE (GGML_SCALE_MODE_BILINEAR | GGML_SCALE_FLAG_ANTIALIAS)
 
-struct build_vit_opts {
-    ggml_tensor * attn_mask = nullptr;
-};
-
 struct clip_graph {
     const clip_model & model;
     const clip_hparams & hparams;
@@ -67,8 +63,7 @@ struct clip_graph {
                 norm_type norm_t,
                 ffn_op_type ffn_t,
                 ggml_tensor * learned_pos_embd,
-                std::function<ggml_tensor *(ggml_tensor *, const clip_layer &)> add_pos,
-                const build_vit_opts & opts = {});
+                std::function<ggml_tensor *(ggml_tensor *, const clip_layer &)> add_pos);
 
     // build the input after conv2d (inp_raw --> patches)
     // returns tensor with shape [n_embd, n_patches]
