@@ -4,6 +4,7 @@
 #include "llama-batch.h"
 #include "llama-hparams.h"
 #include "llama-adapter.h"
+#include "llama-ffn-local.h"
 
 #include <cstdint>
 #include <vector>
@@ -568,6 +569,10 @@ struct llm_graph_params {
 
     llm_graph_result * res;
 
+    // FNN-RAM-CPU split mode (optional, for FFN offload to CPU)
+    ffn_mode_t ffn_mode = FFN_GPU;
+    split_other_t split_other = SPLIT_OTHER_GPU;
+
     // return true if the "other" params would result in a graph with the same topology as with the current params
     //   having the same topology allows us to reuse the graph in some cases
     bool allow_reuse(const llm_graph_params & other) const {
@@ -758,6 +763,10 @@ struct llm_graph_context {
     const llama_adapter_loras    * loras;
     const llama_memory_context_i * mctx;
     const llama_cross            * cross;
+
+    // FNN-RAM-CPU split mode
+    ffn_mode_t ffn_mode = FFN_GPU;
+    split_other_t split_other = SPLIT_OTHER_GPU;
 
     std::map<llama_seq_id, llama_sampler *> samplers;
 

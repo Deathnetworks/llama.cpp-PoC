@@ -352,6 +352,10 @@ private:
     // env: LLAMA_GRAPH_REUSE_DISABLE
     bool graph_reuse_disable = false;
 
+    // FNN-RAM-CPU split mode
+    ffn_mode_t ffn_mode = FFN_GPU;
+    split_other_t split_other = SPLIT_OTHER_GPU;
+
     // perf
     mutable int64_t t_start_us  = 0;
     mutable int64_t t_load_us   = 0;

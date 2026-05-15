@@ -177,6 +177,41 @@ llama_context::llama_context(
         }
     }
 
+    // FNN-RAM-CPU split mode
+    switch (params.ffn_split_mode) {
+        case 1:
+            ffn_mode = FFN_LOCAL;
+            split_other = SPLIT_OTHER_GPU;
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (FFN on CPU)\n", __func__);
+            break;
+        case 2:
+            ffn_mode = FFN_LOCAL;
+            split_other = SPLIT_OTHER_CPU;
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (FFN+other on CPU)\n", __func__);
+            break;
+        case 3:
+            ffn_mode = FFN_LOCAL;
+            split_other = SPLIT_OTHER_ALL_CPU;
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (all non-attention on CPU)\n", __func__);
+            break;
+        default:
+            ffn_mode = FFN_GPU;
+            split_other = SPLIT_OTHER_GPU;
+            break;
+    }
+
+    // Override with environment variables if set
+    {
+        const char * env = getenv("LLAMA_SPLIT_OTHER");
+        if (env) {
+            if (strcmp(env, "cpu") == 0) {
+                split_other = SPLIT_OTHER_CPU;
+            } else if (strcmp(env, "all_cpu") == 0) {
+                split_other = SPLIT_OTHER_ALL_CPU;
+            }
+        }
+    }
+
     // ref: https://github.com/ggml-org/llama.cpp/pull/17046#discussion_r2503085732
     cparams.n_ctx = GGML_PAD(cparams.n_ctx, 256);
 
@@ -2166,6 +2201,8 @@ llm_graph_params llama_context::graph_params(
         /*.n_outputs   =*/ n_outputs,
         /*.cb          =*/ graph_get_cb(),
         /*.res         =*/ res,
+        /*.ffn_mode    =*/ ffn_mode,
+        /*.split_other =*/ split_other,
     };
 }
 
@@ -3227,8 +3264,9 @@ llama_context_params llama_context_default_params() {
         /*.op_offload                  =*/ true,
         /*.swa_full                    =*/ true,
         /*.kv_unified                  =*/ false,
-        /*.sampler                     =*/ nullptr,
-        /*.n_sampler                   =*/ 0,
+        /*.ffn_split_mode              =*/ 0,
+        /*.samplers                    =*/ nullptr,
+        /*.n_samplers                  =*/ 0,
     };
 
     return result;

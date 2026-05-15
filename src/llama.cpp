@@ -277,15 +277,20 @@ static bool llama_prepare_model_devices(const llama_model_params & params, llama
 static std::pair<int, llama_model *> llama_model_load(struct gguf_context * metadata, llama_model_set_tensor_data_t set_tensor_data, void * set_tensor_data_ud,
         const std::string & fname, std::vector<std::string> & splits, FILE * file, llama_model_params & params) {
     try {
-        ffn_mode_t ffn_mode = params.split_mode == LLAMA_SPLIT_MODE_FFN_LOCAL ? FFN_LOCAL : FFN_GPU;
+        ffn_mode_t ffn_mode = params.ffn_split_mode > 0 ? FFN_LOCAL : FFN_GPU;
         split_other_t split_other = SPLIT_OTHER_GPU;
+        switch (params.ffn_split_mode) {
+            case 2: split_other = SPLIT_OTHER_CPU; break;
+            case 3: split_other = SPLIT_OTHER_ALL_CPU; break;
+            default: break;
+        }
         {
             const char * env = getenv("LLAMA_SPLIT_OTHER");
             if (env) {
                 if (strcmp(env, "cpu") == 0) {
-                    split_other = SPLIT_OTHER_CPU;  // SSM/other to CPU, embedding/output stay on GPU
+                    split_other = SPLIT_OTHER_CPU;
                 } else if (strcmp(env, "all_cpu") == 0) {
-                    split_other = SPLIT_OTHER_ALL_CPU;  // everything non-attention to CPU
+                    split_other = SPLIT_OTHER_ALL_CPU;
                 }
             }
         }
@@ -335,8 +340,7 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         model->print_info();
 
         if (ffn_mode == FFN_LOCAL) {
-            model_ptr->ffn_mode = FFN_LOCAL;
-            LLAMA_LOG_INFO("%s: FFN_LOCAL mode enabled — FFN weights routed to CPU, graph scheduler handles cross-backend copies\n", __func__);
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled — FFN weights routed to CPU, graph scheduler handles cross-backend copies\n", __func__);
         }
 
         if (params.vocab_only) {

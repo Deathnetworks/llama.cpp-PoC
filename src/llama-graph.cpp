@@ -953,6 +953,7 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     mctx             (params.mctx),
     cross            (params.cross),
     ffn_mode         (params.ffn_mode),
+    split_other      (params.split_other),
     samplers         (params.samplers),
     cb_func          (params.cb),
     res              (params.res),

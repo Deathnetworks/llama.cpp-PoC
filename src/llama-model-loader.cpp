@@ -1172,7 +1172,6 @@ struct ggml_tensor * llama_model_loader::create_tensor(
                 return list;
             }();
             buft_list = &buft_list_ffn_cpu;
-            fprintf(stderr, "FNN-RAM-CPU: routing tensor %s to CPU-only buffer\n", tn.str().c_str());
         } else {
             switch (info.layer) {
                 case LLM_TENSOR_LAYER_INPUT:

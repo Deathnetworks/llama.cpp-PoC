@@ -293,6 +293,10 @@ extern "C" {
         int32_t n_gpu_layers; // number of layers to store in VRAM, a negative value means all layers
         enum llama_split_mode split_mode; // how to split the model across multiple GPUs
 
+        // [EXPERIMENTAL] FNN-RAM-CPU split mode
+        // 0 = GPU-ONLY (default), 1 = FFN on CPU, 2 = FFN+other on CPU, 3 = all non-attention on CPU
+        int32_t ffn_split_mode = 0;
+
         // the GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
         int32_t main_gpu;
 
@@ -362,6 +366,11 @@ extern "C" {
         // currently works only with CPU execution
         ggml_abort_callback abort_callback;
         void *              abort_callback_data;
+
+        // [EXPERIMENTAL]
+        // FNN-RAM-CPU split mode: offload FFN weights to CPU RAM
+        // 0 = GPU-ONLY (default), 1 = FFN on CPU, 2 = FFN+other on CPU
+        int32_t ffn_split_mode = 0;
 
         // Keep the booleans together and at the end of the struct to avoid misalignment during copy-by-value.
         bool embeddings;  // if true, extract embeddings (together with logits)

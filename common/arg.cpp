@@ -2345,21 +2345,49 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_N_GPU_LAYERS"));
     add_opt(common_arg(
-        {"-sm", "--split-mode"}, "{none,layer,row,tensor}",
+        {"-sm", "--split-mode"}, "{none,layer,row,tensor,gpu-only,fnn-ram-cpu,fnn-ram-cpu-other,fnn-ram-cpu-all}",
         "how to split the model across multiple GPUs, one of:\n"
         "- none: use one GPU only\n"
         "- layer (default): split layers and KV across GPUs (pipelined)\n"
         "- row: split weight across GPUs by rows (parallelized)\n"
-        "- tensor: split weights and KV across GPUs (parallelized, EXPERIMENTAL)",
+        "- tensor: split weights and KV across GPUs (parallelized, EXPERIMENTAL)\n"
+        "- gpu-only: all weights on GPU (alias for layer)\n"
+        "- fnn-ram-cpu: FFN weights on CPU RAM, attention on GPU (reduces VRAM)\n"
+        "- fnn-ram-cpu-other: FFN + SSM/other on CPU, embedding on GPU\n"
+        "- fnn-ram-cpu-all: all non-attention weights on CPU (maximum VRAM savings)",
         [](common_params & params, const std::string & value) {
             if (value == "none") {
                 params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 0;
             } else if (value == "layer") {
                 params.split_mode = LLAMA_SPLIT_MODE_LAYER;
+                params.ffn_split_mode = 0;
             } else if (value == "row") {
                 params.split_mode = LLAMA_SPLIT_MODE_ROW;
+                params.ffn_split_mode = 0;
             } else if (value == "tensor") {
                 params.split_mode = LLAMA_SPLIT_MODE_TENSOR;
+                params.ffn_split_mode = 0;
+            } else if (value == "gpu-only") {
+                params.split_mode = LLAMA_SPLIT_MODE_LAYER;
+                params.ffn_split_mode = 0;
+            } else if (value == "fnn-ram-cpu") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 1;
+            } else if (value == "fnn-ram-cpu-other") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 2;
+            } else if (value == "fnn-ram-cpu-all") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 3;
+            } else if (value == "local-gpu") {
+                // backward compatibility
+                params.split_mode = LLAMA_SPLIT_MODE_LAYER;
+                params.ffn_split_mode = 0;
+            } else if (value == "local-ssd") {
+                // backward compatibility
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 1;
             } else {
                 throw std::invalid_argument("invalid value");
             }

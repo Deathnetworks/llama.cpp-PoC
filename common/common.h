@@ -445,6 +445,9 @@ struct common_params {
 
     enum llama_split_mode split_mode = LLAMA_SPLIT_MODE_LAYER; // how to split the model across GPUs
 
+    // [EXPERIMENTAL] FNN-RAM-CPU split mode: 0=GPU-ONLY, 1=FFN on CPU, 2=FFN+other on CPU, 3=all non-attention on CPU
+    int32_t ffn_split_mode = 0;
+
     common_cpu_params cpuparams;
     common_cpu_params cpuparams_batch;
 
