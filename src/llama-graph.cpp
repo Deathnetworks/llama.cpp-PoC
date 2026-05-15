@@ -1,28 +1,3 @@
-
-#include "llama-ffn-local.h"
-
-extern ffn_mmap_t* get_global_ffn_mmap();
-
-struct ffn_cpu_userdata {
-    const ffn_mmap_t* ffn_mmap;
-    int layer;
-};
-
-static void ffn_cpu_custom_op(struct ggml_tensor * dst, const struct ggml_tensor * /*a*/, int /*ith*/, int /*nth*/, void * userdata) {
-    auto* ctx_ud = (ffn_cpu_userdata*)userdata;
-    int n_tokens = dst->ne[1] * dst->ne[2] * dst->ne[3];
-    int n_embd = dst->ne[0];
-
-    if (dst->type == GGML_TYPE_F32) {
-        float* h_f32_ptr = (float*)dst->data;
-        llm_compute_ffn_cpu(ctx_ud->ffn_mmap, ctx_ud->layer, h_f32_ptr, n_tokens, n_embd);
-    }
-}
-
-#include "llama-ffn-local.h"
-
-extern ffn_mmap_t* get_global_ffn_mmap();
-
 #include "llama-graph.h"
 
 #include "llama-impl.h"
@@ -1183,12 +1158,6 @@ ggml_tensor * llm_graph_context::build_ffn(
      llm_ffn_op_type   type_op,
    llm_ffn_gate_type   type_gate,
                  int   il) const {
-
-    if (get_global_ffn_mmap()) {
-        auto* udata = new ffn_cpu_userdata{get_global_ffn_mmap(), il};
-        ggml_tensor * out = ggml_map_custom1_inplace(ctx0, cur, ffn_cpu_custom_op, 1, udata);
-        return out;
-    }
     ggml_tensor * tmp = up ? build_lora_mm(up, cur) : cur;
     cb(tmp, "ffn_up", il);
 

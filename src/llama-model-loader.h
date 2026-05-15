@@ -1,8 +1,6 @@
-#include "llama-split-info.h"
 #pragma once
 
 #include "llama.h"
-#include "llama-split-info.h"
 
 #include "llama-impl.h"
 #include "llama-arch.h"
@@ -31,7 +29,6 @@ enum llama_fver {
 const char * llama_file_version_name(llama_fver version);
 
 struct llama_model_loader {
-    split_info_t split_info;
     // Holds information on a model weight
     struct llama_tensor_weight {
         uint16_t  idx; // source file index
@@ -98,8 +95,6 @@ struct llama_model_loader {
     llama_model_set_tensor_data_t set_tensor_data;
     void * set_tensor_data_ud;
     std::vector<ggml_context_ptr> contexts;
-
-    split_info_t split_info; // Split metadata from GGUF file
 
     std::string arch_name;
     LLM_KV      llm_kv    = LLM_KV(LLM_ARCH_UNKNOWN);
