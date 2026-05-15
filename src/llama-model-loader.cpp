@@ -518,9 +518,12 @@ llama_model_loader::llama_model_loader(
         bool use_direct_io,
         bool check_tensors,
         bool no_alloc,
+        ffn_mode_t ffn_mode,
+        split_other_t split_other,
         const llama_model_kv_override * param_overrides_p,
         const llama_model_tensor_buft_override * param_tensor_buft_overrides_p)
-        : metadata(meta), set_tensor_data(set_tensor_data), set_tensor_data_ud(set_tensor_data_ud) {
+        : metadata(meta), set_tensor_data(set_tensor_data), set_tensor_data_ud(set_tensor_data_ud),
+          use_mmap(use_mmap), use_direct_io(use_direct_io), check_tensors(check_tensors), no_alloc(no_alloc), ffn_mode(ffn_mode), split_other(split_other) {
     int trace = 0;
     if (getenv("LLAMA_TRACE")) {
         trace = atoi(getenv("LLAMA_TRACE"));
@@ -1135,19 +1138,56 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
         // select the buffer type for this tensor
         const buft_list_t * buft_list;
-        switch (info.layer) {
-            case LLM_TENSOR_LAYER_INPUT:
-                buft_list = buft_list_input;
-                break;
-            case LLM_TENSOR_LAYER_OUTPUT:
-                buft_list = buft_list_output;
-                break;
-            case LLM_TENSOR_LAYER_REPEATING:
-                GGML_ASSERT(buft_list_layer != nullptr);
-                buft_list = buft_list_layer;
-                break;
-            default:
-                GGML_ABORT("invalid layer %d for tensor %s", info.layer, tn.str().c_str());
+        const bool is_ffn = is_ffn_tensor(tn.str().c_str());
+        const bool is_other = is_other_tensor(tn.str().c_str());
+        const bool is_emb_out = is_embedding_or_output(tn.str().c_str());
+
+        // Determine if this tensor should be routed to CPU
+        bool route_to_cpu = false;
+        if (ffn_mode == FFN_LOCAL) {
+            if (is_ffn) {
+                // FFN always goes to CPU in FNN-RAM-CPU mode
+                route_to_cpu = true;
+            } else if (is_other) {
+                // Other tensors: depends on split_other setting
+                if (split_other == SPLIT_OTHER_CPU && !is_emb_out) {
+                    // SSM/other to CPU, but keep embedding/output on GPU
+                    route_to_cpu = true;
+                } else if (split_other == SPLIT_OTHER_ALL_CPU) {
+                    // Everything non-attention to CPU (including embedding/output)
+                    route_to_cpu = true;
+                }
+            }
+        }
+
+        if (route_to_cpu) {
+            // Route to pure CPU buffer (not buft_list_cpu which may include
+            // ACCEL backends like OpenCL). This keeps weights in host RAM.
+            static buft_list_t buft_list_ffn_cpu = []{
+                buft_list_t list;
+                auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+                if (cpu_dev) {
+                    list.emplace_back(cpu_dev, ggml_backend_dev_buffer_type(cpu_dev));
+                }
+                return list;
+            }();
+            buft_list = &buft_list_ffn_cpu;
+            fprintf(stderr, "FNN-RAM-CPU: routing tensor %s to CPU-only buffer\n", tn.str().c_str());
+        } else {
+            switch (info.layer) {
+                case LLM_TENSOR_LAYER_INPUT:
+                    buft_list = buft_list_input;
+                    break;
+                case LLM_TENSOR_LAYER_OUTPUT:
+                    buft_list = buft_list_output;
+                    break;
+                case LLM_TENSOR_LAYER_REPEATING:
+                    GGML_ASSERT(buft_list_layer != nullptr);
+                    buft_list = buft_list_layer;
+                    break;
+                default:
+                    GGML_ABORT("invalid layer %d for tensor %s", info.layer, tn.str().c_str());
+            }
         }
 
         ggml_backend_buffer_type_t buft = nullptr;
@@ -1160,7 +1200,27 @@ struct ggml_tensor * llama_model_loader::create_tensor(
                 if (std::regex_search(tensor_name, pattern)) {
                     if (overrides->buft == ggml_backend_cpu_buffer_type()) {
                         // when overriding to a CPU buffer, consider the extra buffer types
-                        buft = select_weight_buft(hparams, t_meta, op, buft_list_cpu);
+                        // For FFN_LOCAL, use pure CPU buft to avoid ACCEL backends
+                        const bool is_ffn = is_ffn_tensor(tn.str().c_str());
+                        const bool is_other = is_other_tensor(tn.str().c_str());
+                        const bool is_emb_out = is_embedding_or_output(tn.str().c_str());
+                        bool route_to_cpu = false;
+                        if (ffn_mode == FFN_LOCAL) {
+                            if (is_ffn) {
+                                route_to_cpu = true;
+                            } else if (is_other) {
+                                if (split_other == SPLIT_OTHER_CPU && !is_emb_out) {
+                                    route_to_cpu = true;
+                                } else if (split_other == SPLIT_OTHER_ALL_CPU) {
+                                    route_to_cpu = true;
+                                }
+                            }
+                        }
+                        if (route_to_cpu) {
+                            buft = ggml_backend_cpu_buffer_type();
+                        } else {
+                            buft = select_weight_buft(hparams, t_meta, op, buft_list_cpu);
+                        }
                         if (use_mmap) {
                             static std::once_flag once;
                             std::call_once(once, [] {

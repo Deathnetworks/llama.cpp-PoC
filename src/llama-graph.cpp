@@ -1,4 +1,5 @@
 #include "llama-graph.h"
+#include "llama-ffn-local.h"
 
 #include "llama-impl.h"
 #include "llama-model.h"
@@ -951,6 +952,9 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     loras            (params.loras),
     mctx             (params.mctx),
     cross            (params.cross),
+    ffn_mode         (params.ffn_mode),
+    ffn_mmap         (params.ffn_mmap),
+    ffn_uds          (params.ffn_uds),
     samplers         (params.samplers),
     cb_func          (params.cb),
     res              (params.res),
@@ -1036,6 +1040,10 @@ ggml_tensor * llm_graph_context::build_norm(
          ggml_tensor * mb,
        llm_norm_type   type,
                  int   il) const {
+    // FFN_LOCAL: build the norm normally on CPU (weights are on CPU buffer).
+    // The old code skipped this because ffn_local_callback handled norm on CPU,
+    // but now we build the full FFN graph on CPU so the norm must be applied here.
+
     switch (type) {
         case LLM_NORM:       cur = ggml_norm    (ctx0, cur, hparams.f_norm_eps);     break;
         case LLM_NORM_RMS:   cur = ggml_rms_norm(ctx0, cur, hparams.f_norm_rms_eps); break;
@@ -1158,6 +1166,12 @@ ggml_tensor * llm_graph_context::build_ffn(
      llm_ffn_op_type   type_op,
    llm_ffn_gate_type   type_gate,
                  int   il) const {
+    // FFN_LOCAL: FFN weights are on CPU buffer (routed by llama-model_loader).
+    // The graph scheduler will automatically insert GPU→CPU copies for the
+    // residual input and CPU→GPU copies for the output, since the FFN weight
+    // tensors are on a pure CPU buffer. No custom op needed.
+    // Fall through to normal FFN graph below.
+
     ggml_tensor * tmp = up ? build_lora_mm(up, cur) : cur;
     cb(tmp, "ffn_up", il);
 

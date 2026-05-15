@@ -6,6 +6,7 @@
 #include "llama-arch.h"
 #include "llama-hparams.h"
 #include "llama-mmap.h"
+#include "llama-ffn-local.h"
 
 #include "ggml-cpp.h"
 
@@ -79,6 +80,8 @@ struct llama_model_loader {
     bool use_direct_io = false;
     bool check_tensors;
     bool no_alloc;
+    ffn_mode_t ffn_mode = FFN_GPU;
+    split_other_t split_other = SPLIT_OTHER_GPU;
 
     llama_files files;
     llama_ftype ftype;
@@ -130,6 +133,8 @@ struct llama_model_loader {
         bool use_direct_io,
         bool check_tensors,
         bool no_alloc,
+        ffn_mode_t ffn_mode,
+        split_other_t split_other,
         const llama_model_kv_override * param_overrides_p,
         const llama_model_tensor_buft_override * param_tensor_buft_overrides_p);
 

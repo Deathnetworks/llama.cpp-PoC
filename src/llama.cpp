@@ -9,6 +9,7 @@
 #include "llama-model-loader.h"
 #include "llama-model-saver.h"
 #include "llama-model.h"
+#include "llama-ffn-local.h"
 
 #include "ggml.h"
 #include "ggml-cpp.h"
@@ -276,11 +277,25 @@ static bool llama_prepare_model_devices(const llama_model_params & params, llama
 static std::pair<int, llama_model *> llama_model_load(struct gguf_context * metadata, llama_model_set_tensor_data_t set_tensor_data, void * set_tensor_data_ud,
         const std::string & fname, std::vector<std::string> & splits, FILE * file, llama_model_params & params) {
     try {
+        ffn_mode_t ffn_mode = params.split_mode == LLAMA_SPLIT_MODE_FFN_LOCAL ? FFN_LOCAL : FFN_GPU;
+        split_other_t split_other = SPLIT_OTHER_GPU;
+        {
+            const char * env = getenv("LLAMA_SPLIT_OTHER");
+            if (env) {
+                if (strcmp(env, "cpu") == 0) {
+                    split_other = SPLIT_OTHER_CPU;  // SSM/other to CPU, embedding/output stay on GPU
+                } else if (strcmp(env, "all_cpu") == 0) {
+                    split_other = SPLIT_OTHER_ALL_CPU;  // everything non-attention to CPU
+                }
+            }
+        }
         llama_model_loader ml(metadata, set_tensor_data, set_tensor_data_ud, fname, splits, file, params.use_mmap, params.use_direct_io,
-            params.check_tensors, params.no_alloc, params.kv_overrides, params.tensor_buft_overrides);
+            params.check_tensors, params.no_alloc, ffn_mode, split_other, params.kv_overrides, params.tensor_buft_overrides);
 
         ml.print_info();
         std::unique_ptr<llama_model> model_ptr(llama_model_create(ml, params));
+
+
 
         bool ok = llama_prepare_model_devices(params, model_ptr.get());
         if (!ok) {
@@ -319,14 +334,22 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         model->load_stats(ml);
         model->print_info();
 
+        if (ffn_mode == FFN_LOCAL) {
+            model_ptr->ffn_mode = FFN_LOCAL;
+            LLAMA_LOG_INFO("%s: FFN_LOCAL mode enabled — FFN weights routed to CPU, graph scheduler handles cross-backend copies\n", __func__);
+        }
+
         if (params.vocab_only) {
             LLAMA_LOG_INFO("%s: vocab only - skipping tensors\n", __func__);
             return {0, model_ptr.release()};
         }
 
+        LLAMA_LOG_INFO("%s: DEBUG: loading tensors...\n", __func__);
         if (!model->load_tensors(ml)) {
+            LLAMA_LOG_ERROR("%s: DEBUG: load_tensors failed\n", __func__);
             return {-2, nullptr};
         }
+        LLAMA_LOG_INFO("%s: DEBUG: tensors loaded successfully\n", __func__);
 
         return {0, model_ptr.release()};
     } catch (const std::exception & err) {
