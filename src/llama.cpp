@@ -290,9 +290,17 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             default: break;
         }
         if (ffn_mode == FFN_LOCAL) {
-            fprintf(stderr, "FNN-RAM-CPU: mode=%d\n", params.ffn_split_mode);
+            static bool ffn_ram_cpu_msg_shown = false;
+            if (!ffn_ram_cpu_msg_shown) {
+                fprintf(stderr, "FNN-RAM-CPU: mode=%d\n", params.ffn_split_mode);
+                ffn_ram_cpu_msg_shown = true;
+            }
         } else if (ffn_mode == FFN_ZERO_CPU) {
-            fprintf(stderr, "FNN-ZERO-CPU: mode=%d — FFN weights mmap'd from SSD\n", params.ffn_split_mode);
+            static bool ffn_zero_cpu_msg_shown = false;
+            if (!ffn_zero_cpu_msg_shown) {
+                fprintf(stderr, "FNN-ZERO-CPU: mode=%d — FFN weights mmap'd from SSD\n", params.ffn_split_mode);
+                ffn_zero_cpu_msg_shown = true;
+            }
         }
         {
             const char * env = getenv("LLAMA_SPLIT_OTHER");

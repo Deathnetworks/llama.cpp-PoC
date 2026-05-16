@@ -8,7 +8,15 @@
 #include <algorithm>
 #include <array>
 #include <cinttypes>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <sys/mman.h>  // for madvise, posix_madvise
+#endif
 #include <cstdint>
 #include <cstring>
 #include <future>
@@ -1163,9 +1171,10 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
         if (route_to_cpu) {
             if (ffn_mode == FFN_ZERO_CPU) {
-                // When use_mmap=true, tensors are allocated in the mmap'd GGUF file region.
-                // The OS page-faults in 4KB pages from SSD on each access.
-                // RAM usage is minimal — only actively-used pages are in the page cache.
+                // FFN-ZERO-CPU requires mmap to be enabled so that weights stay in the
+                // mmap'd GGUF file region. We use MADV_DONTNEED to drop pages from the
+                // OS page cache, forcing page faults from SSD on each access.
+                // This achieves true zero-RAM: only the actively-used 4KB page is in RAM.
                 if (!use_mmap) {
                     LLAMA_LOG_WARN("%s: FFN-ZERO-CPU works best with mmap. Consider removing --no-mmap.\n", __func__);
                 }
@@ -1439,32 +1448,87 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
         }
 
         // Apply memory advice based on ffn_mode
-        if (ffn_mode == FFN_ZERO_CPU) {
-            // FFN-ZERO-CPU: Drop all mmap pages from OS page cache.
-            // When CPU FFN computation accesses weights, the OS will page-fault
-            // and load exactly the 4KB page needed from SSD.
-            // This minimizes RAM usage — only actively-used pages are in memory.
-            for (const auto & mapping : mappings) {
-                if (mapping->addr() && mapping->size() > 0) {
-                    // MADV_DONTNEED tells the OS to drop these pages from cache
-                    // The pages remain mapped but will be re-faulted from file on next access
-                    posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_DONTNEED);
+        // Use static flags to avoid applying twice (model loads twice: metadata + tensor data)
+        static bool ffn_zero_cpu_advice_applied = false;
+        static bool ffn_ram_cpu_advice_applied = false;
+
+        if (ffn_mode == FFN_ZERO_CPU && !ffn_zero_cpu_advice_applied) {
+            ffn_zero_cpu_advice_applied = true;
+            // FFN-ZERO-CPU: Drop only FFN weight pages from OS page cache.
+            // We iterate through the weights_map and apply MADV_DONTNEED to
+            // the specific file offset ranges that contain FFN weights.
+            // This forces page faults from SSD only for FFN computation,
+            // while attention weights remain cached for fast GPU access.
+            size_t ffn_ranges_applied = 0;
+            size_t ffn_bytes_dropped = 0;
+            for (const auto & it : weights_map) {
+                const llama_tensor_weight & w = it.second;
+                const std::string & name = it.first;
+                if (is_ffn_tensor(name.c_str())) {
+                    // Find the mapping for this weight's file
+                    if (w.idx < mappings.size()) {
+                        const auto & mapping = mappings[w.idx];
+                        if (mapping->addr() && ggml_nbytes(w.tensor) > 0) {
+                            // Align to 4KB page boundary for madvise
+                            size_t page_size = 4096;
+                            size_t tensor_size = ggml_nbytes(w.tensor);
+                            uintptr_t start = ((uintptr_t)mapping->addr() + w.offs + page_size - 1) & ~(page_size - 1);
+                            uintptr_t end = ((uintptr_t)mapping->addr() + w.offs + tensor_size) & ~(page_size - 1);
+                            if (end > start) {
+#ifdef _WIN32
+                                HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+                                if (hKernel32) {
+                                    auto pDiscardVirtualMemory = (DWORD (WINAPI *)(PVOID, SIZE_T))
+                                        GetProcAddress(hKernel32, "DiscardVirtualMemory");
+                                    if (pDiscardVirtualMemory) {
+                                        pDiscardVirtualMemory((PVOID)start, (SIZE_T)(end - start));
+                                    }
+                                }
+#else
+                                posix_madvise((void*)start, end - start, POSIX_MADV_DONTNEED);
+#endif
+                                ffn_ranges_applied++;
+                                ffn_bytes_dropped += (end - start);
+                            }
+                        }
+                    }
                 }
             }
-            LLAMA_LOG_INFO("%s: FFN-ZERO-CPU — dropped %.1f GB from page cache (zero-copy mode)\n",
-                __func__, mappings.size() > 0 ? (double)mappings[0]->size() / (1024.0*1024.0*1024.0) : 0);
-        } else if (ffn_mode == FFN_LOCAL) {
+            fprintf(stderr, "FFN-ZERO-CPU: dropped %zu FFN ranges (%.1f MB) from page cache\n",
+                ffn_ranges_applied, (double)ffn_bytes_dropped / (1024.0*1024.0));
+        } else if (ffn_mode == FFN_LOCAL && !ffn_ram_cpu_advice_applied) {
+            ffn_ram_cpu_advice_applied = true;
             // FFN-RAM-CPU: Pre-warm the mmap pages into RAM by reading them.
             // This ensures the weights are in RAM before inference starts,
             // avoiding page faults during the first forward pass.
             for (const auto & mapping : mappings) {
                 if (mapping->addr() && mapping->size() > 0) {
+#ifdef _WIN32
+                    // Windows alternative: PrefetchVirtualMemory (Win 8+)
+                    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+                    if (hKernel32) {
+                        typedef struct _WIN32_MEMORY_RANGE_ENTRY {
+                            PVOID  VirtualAddress;
+                            SIZE_T NumberOfBytes;
+                        } WIN32_MEMORY_RANGE_ENTRY, *PWIN32_MEMORY_RANGE_ENTRY;
+
+                        auto pPrefetchVirtualMemory = (BOOL (WINAPI *)(HANDLE, ULONG_PTR, PWIN32_MEMORY_RANGE_ENTRY, ULONG))
+                            GetProcAddress(hKernel32, "PrefetchVirtualMemory");
+                        if (pPrefetchVirtualMemory) {
+                            WIN32_MEMORY_RANGE_ENTRY range;
+                            range.VirtualAddress = mapping->addr();
+                            range.NumberOfBytes  = mapping->size();
+                            pPrefetchVirtualMemory(GetCurrentProcess(), 1, &range, 0);
+                        }
+                    }
+#else
                     // MADV_WILLNEED tells the OS to pre-fetch these pages into RAM
                     posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_WILLNEED);
+#endif
                 }
             }
-            LLAMA_LOG_INFO("%s: FNN-RAM-CPU — pre-warmed %.1f GB into RAM\n",
-                __func__, mappings.size() > 0 ? (double)mappings[0]->size() / (1024.0*1024.0*1024.0) : 0);
+            fprintf(stderr, "FNN-RAM-CPU: pre-warmed %.1f GB into RAM\n",
+                mappings.size() > 0 ? (double)mappings[0]->size() / (1024.0*1024.0*1024.0) : 0);
         }
     }
 
