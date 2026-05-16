@@ -12,7 +12,7 @@
 enum ffn_mode_t {
     FFN_GPU      = 0,  // default — all weights on GPU (GPU-ONLY mode)
     FFN_LOCAL    = 1,  // FFN weights on CPU RAM, attention on GPU (FNN-RAM-CPU mode)
-    FFN_ZERO_CPU = 2,  // FFN weights mmap'd from SSD, attention on GPU (FNN-ZERO-CPU mode)
+    FFN_ZERO_CPU = 2,  // FFN weights on CPU/SSD, MTP predictor FFN on GPU (FNN-ZERO-CPU mode)
 };
 
 // ── Per-layer weight pointers ────────────────────────────────────────────
@@ -77,6 +77,18 @@ inline bool is_ffn_tensor(const char* name) {
            strstr(name, "ffn_gate_exps") != nullptr ||
            strstr(name, "ffn_up_exps")   != nullptr ||
            strstr(name, "ffn_down_exps") != nullptr;
+}
+
+// Check if an FFN tensor belongs to an MTP predictor layer.
+// MTP layers are identified by having "nextn" tensors.
+// This function checks if the given FFN tensor is in the last layer (where MTP predictor lives).
+inline bool is_ffn_in_mtp_layer(const char* name, int n_layer) {
+    if (name == nullptr || !is_ffn_tensor(name)) return false;
+    // The MTP predictor is typically in the last layer
+    // Check if this FFN tensor is in the last layer
+    char layer_prefix[32];
+    snprintf(layer_prefix, sizeof(layer_prefix), "blk.%d.", n_layer - 1);
+    return strstr(name, layer_prefix) != nullptr;
 }
 
 // Check if a tensor is an attention tensor (should stay on GPU)

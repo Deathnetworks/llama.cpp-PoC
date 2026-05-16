@@ -1155,8 +1155,12 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         bool route_to_cpu = false;
         if (ffn_mode == FFN_LOCAL || ffn_mode == FFN_ZERO_CPU) {
             if (is_ffn) {
-                // FFN always goes to CPU in FNN-RAM-CPU and FNN-ZERO-CPU modes
-                route_to_cpu = true;
+                // In FFN_ZERO_CPU mode, keep MTP predictor FFN on GPU for fast speculative decoding
+                if (ffn_mode == FFN_ZERO_CPU && is_ffn_in_mtp_layer(tn.str().c_str(), hparams.n_layer)) {
+                    route_to_cpu = false;  // MTP predictor FFN stays on GPU
+                } else {
+                    route_to_cpu = true;   // All other FFN goes to CPU/SSD
+                }
             } else if (is_other) {
                 // Other tensors: depends on split_other setting
                 if (split_other == SPLIT_OTHER_CPU && !is_emb_out) {

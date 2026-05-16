@@ -2378,7 +2378,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "- fnn-ram-cpu-all: all non-attention weights on CPU RAM (max VRAM savings)\n"
         "- fnn-zero-cpu: FFN weights mmap'd from SSD (zero-copy, minimal RAM)\n"
         "- fnn-zero-cpu-other: FFN + SSM/other mmap'd from SSD, embedding on GPU\n"
-        "- fnn-zero-cpu-all: all non-attention weights mmap'd from SSD (min RAM)",
+        "- fnn-zero-cpu-all: all non-attention weights mmap'd from SSD (min RAM)\n"
+        "  Note: MTP predictor layer FFN always stays on GPU for fast speculative decoding",
         [](common_params & params, const std::string & value) {
             if (value == "none") {
                 params.split_mode = LLAMA_SPLIT_MODE_NONE;
