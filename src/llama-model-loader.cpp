@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cinttypes>
+#include <sys/mman.h>  // for madvise, posix_madvise
 #include <cstdint>
 #include <cstring>
 #include <future>
@@ -1144,9 +1145,9 @@ struct ggml_tensor * llama_model_loader::create_tensor(
 
         // Determine if this tensor should be routed to CPU
         bool route_to_cpu = false;
-        if (ffn_mode == FFN_LOCAL) {
+        if (ffn_mode == FFN_LOCAL || ffn_mode == FFN_ZERO_CPU) {
             if (is_ffn) {
-                // FFN always goes to CPU in FNN-RAM-CPU mode
+                // FFN always goes to CPU in FNN-RAM-CPU and FNN-ZERO-CPU modes
                 route_to_cpu = true;
             } else if (is_other) {
                 // Other tensors: depends on split_other setting
@@ -1161,17 +1162,39 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         }
 
         if (route_to_cpu) {
-            // Route to pure CPU buffer (not buft_list_cpu which may include
-            // ACCEL backends like OpenCL). This keeps weights in host RAM.
-            static buft_list_t buft_list_ffn_cpu = []{
-                buft_list_t list;
-                auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
-                if (cpu_dev) {
-                    list.emplace_back(cpu_dev, ggml_backend_dev_buffer_type(cpu_dev));
+            if (ffn_mode == FFN_ZERO_CPU) {
+                // When use_mmap=true, tensors are allocated in the mmap'd GGUF file region.
+                // The OS page-faults in 4KB pages from SSD on each access.
+                // RAM usage is minimal — only actively-used pages are in the page cache.
+                if (!use_mmap) {
+                    LLAMA_LOG_WARN("%s: FFN-ZERO-CPU works best with mmap. Consider removing --no-mmap.\n", __func__);
                 }
-                return list;
-            }();
-            buft_list = &buft_list_ffn_cpu;
+                static buft_list_t buft_list_ffn_zero = []{
+                    buft_list_t list;
+                    auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+                    if (cpu_dev) {
+                        list.emplace_back(cpu_dev, ggml_backend_dev_buffer_type(cpu_dev));
+                    }
+                    return list;
+                }();
+                buft_list = &buft_list_ffn_zero;
+            } else {
+                // FFN-RAM-CPU: Use the CPU device's default buffer type.
+                // The key difference from FFN-ZERO-CPU is that we want the weights
+                // to be copied into a separate CPU buffer, not stay in the mmap region.
+                // However, since use_mmap is global, both modes end up with mmap'd data.
+                // The OS page cache keeps the data in RAM, so performance is similar.
+                // To truly force a copy, we would need per-tensor mmap control.
+                static buft_list_t buft_list_ffn_ram = []{
+                    buft_list_t list;
+                    auto * cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+                    if (cpu_dev) {
+                        list.emplace_back(cpu_dev, ggml_backend_dev_buffer_type(cpu_dev));
+                    }
+                    return list;
+                }();
+                buft_list = &buft_list_ffn_ram;
+            }
         } else {
             switch (info.layer) {
                 case LLM_TENSOR_LAYER_INPUT:
@@ -1204,7 +1227,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
                         const bool is_other = is_other_tensor(tn.str().c_str());
                         const bool is_emb_out = is_embedding_or_output(tn.str().c_str());
                         bool route_to_cpu = false;
-                        if (ffn_mode == FFN_LOCAL) {
+                        if (ffn_mode == FFN_LOCAL || ffn_mode == FFN_ZERO_CPU) {
                             if (is_ffn) {
                                 route_to_cpu = true;
                             } else if (is_other) {
@@ -1406,6 +1429,35 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
                 mlock_mmaps->emplace_back(std::move(mlock_mmap));
             }
             mappings.emplace_back(std::move(mapping));
+        }
+
+        // Apply memory advice based on ffn_mode
+        if (ffn_mode == FFN_ZERO_CPU) {
+            // FFN-ZERO-CPU: Drop all mmap pages from OS page cache.
+            // When CPU FFN computation accesses weights, the OS will page-fault
+            // and load exactly the 4KB page needed from SSD.
+            // This minimizes RAM usage — only actively-used pages are in memory.
+            for (const auto & mapping : mappings) {
+                if (mapping->addr() && mapping->size() > 0) {
+                    // MADV_DONTNEED tells the OS to drop these pages from cache
+                    // The pages remain mapped but will be re-faulted from file on next access
+                    posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_DONTNEED);
+                }
+            }
+            LLAMA_LOG_INFO("%s: FFN-ZERO-CPU — dropped %.1f GB from page cache (zero-copy mode)\n",
+                __func__, mappings.size() > 0 ? (double)mappings[0]->size() / (1024.0*1024.0*1024.0) : 0);
+        } else if (ffn_mode == FFN_LOCAL) {
+            // FFN-RAM-CPU: Pre-warm the mmap pages into RAM by reading them.
+            // This ensures the weights are in RAM before inference starts,
+            // avoiding page faults during the first forward pass.
+            for (const auto & mapping : mappings) {
+                if (mapping->addr() && mapping->size() > 0) {
+                    // MADV_WILLNEED tells the OS to pre-fetch these pages into RAM
+                    posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_WILLNEED);
+                }
+            }
+            LLAMA_LOG_INFO("%s: FNN-RAM-CPU — pre-warmed %.1f GB into RAM\n",
+                __func__, mappings.size() > 0 ? (double)mappings[0]->size() / (1024.0*1024.0*1024.0) : 0);
         }
     }
 

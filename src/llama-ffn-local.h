@@ -10,8 +10,9 @@
 
 // ── Mode ─────────────────────────────────────────────────────────────────
 enum ffn_mode_t {
-    FFN_GPU   = 0,  // default — all weights on GPU (GPU-ONLY mode)
-    FFN_LOCAL = 1,  // FFN weights on CPU RAM, attention on GPU (FNN-RAM-CPU mode)
+    FFN_GPU      = 0,  // default — all weights on GPU (GPU-ONLY mode)
+    FFN_LOCAL    = 1,  // FFN weights on CPU RAM, attention on GPU (FNN-RAM-CPU mode)
+    FFN_ZERO_CPU = 2,  // FFN weights mmap'd from SSD, attention on GPU (FNN-ZERO-CPU mode)
 };
 
 // ── Per-layer weight pointers ────────────────────────────────────────────

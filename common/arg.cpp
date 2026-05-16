@@ -2345,7 +2345,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_N_GPU_LAYERS"));
     add_opt(common_arg(
-        {"-sm", "--split-mode"}, "{none,layer,row,tensor,gpu-only,fnn-ram-cpu,fnn-ram-cpu-other,fnn-ram-cpu-all}",
+        {"-sm", "--split-mode"}, "{none,layer,row,tensor,gpu-only,fnn-ram-cpu,fnn-ram-cpu-other,fnn-ram-cpu-all,fnn-zero-cpu,fnn-zero-cpu-other,fnn-zero-cpu-all}",
         "how to split the model across multiple GPUs, one of:\n"
         "- none: use one GPU only\n"
         "- layer (default): split layers and KV across GPUs (pipelined)\n"
@@ -2353,8 +2353,11 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "- tensor: split weights and KV across GPUs (parallelized, EXPERIMENTAL)\n"
         "- gpu-only: all weights on GPU (alias for layer)\n"
         "- fnn-ram-cpu: FFN weights on CPU RAM, attention on GPU (reduces VRAM)\n"
-        "- fnn-ram-cpu-other: FFN + SSM/other on CPU, embedding on GPU\n"
-        "- fnn-ram-cpu-all: all non-attention weights on CPU (maximum VRAM savings)",
+        "- fnn-ram-cpu-other: FFN + SSM/other on CPU RAM, embedding on GPU\n"
+        "- fnn-ram-cpu-all: all non-attention weights on CPU RAM (max VRAM savings)\n"
+        "- fnn-zero-cpu: FFN weights mmap'd from SSD (zero-copy, minimal RAM)\n"
+        "- fnn-zero-cpu-other: FFN + SSM/other mmap'd from SSD, embedding on GPU\n"
+        "- fnn-zero-cpu-all: all non-attention weights mmap'd from SSD (min RAM)",
         [](common_params & params, const std::string & value) {
             if (value == "none") {
                 params.split_mode = LLAMA_SPLIT_MODE_NONE;
@@ -2380,6 +2383,15 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             } else if (value == "fnn-ram-cpu-all") {
                 params.split_mode = LLAMA_SPLIT_MODE_NONE;
                 params.ffn_split_mode = 3;
+            } else if (value == "fnn-zero-cpu") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 4;
+            } else if (value == "fnn-zero-cpu-other") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 5;
+            } else if (value == "fnn-zero-cpu-all") {
+                params.split_mode = LLAMA_SPLIT_MODE_NONE;
+                params.ffn_split_mode = 6;
             } else if (value == "local-gpu") {
                 // backward compatibility
                 params.split_mode = LLAMA_SPLIT_MODE_LAYER;

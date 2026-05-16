@@ -277,15 +277,22 @@ static bool llama_prepare_model_devices(const llama_model_params & params, llama
 static std::pair<int, llama_model *> llama_model_load(struct gguf_context * metadata, llama_model_set_tensor_data_t set_tensor_data, void * set_tensor_data_ud,
         const std::string & fname, std::vector<std::string> & splits, FILE * file, llama_model_params & params) {
     try {
-        ffn_mode_t ffn_mode = params.ffn_split_mode > 0 ? FFN_LOCAL : FFN_GPU;
+        ffn_mode_t ffn_mode = FFN_GPU;
+        switch (params.ffn_split_mode) {
+            case 1: case 2: case 3: ffn_mode = FFN_LOCAL; break;
+            case 4: case 5: case 6: ffn_mode = FFN_ZERO_CPU; break;
+            default: break;
+        }
         split_other_t split_other = SPLIT_OTHER_GPU;
         switch (params.ffn_split_mode) {
-            case 2: split_other = SPLIT_OTHER_CPU; break;
-            case 3: split_other = SPLIT_OTHER_ALL_CPU; break;
+            case 2: case 5: split_other = SPLIT_OTHER_CPU; break;
+            case 3: case 6: split_other = SPLIT_OTHER_ALL_CPU; break;
             default: break;
         }
         if (ffn_mode == FFN_LOCAL) {
-            LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (ffn_split_mode=%d)\n", __func__, params.ffn_split_mode);
+            fprintf(stderr, "FNN-RAM-CPU: mode=%d\n", params.ffn_split_mode);
+        } else if (ffn_mode == FFN_ZERO_CPU) {
+            fprintf(stderr, "FNN-ZERO-CPU: mode=%d — FFN weights mmap'd from SSD\n", params.ffn_split_mode);
         }
         {
             const char * env = getenv("LLAMA_SPLIT_OTHER");
