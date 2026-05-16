@@ -1423,6 +1423,7 @@ void llama_model_loader::done_getting_tensors(bool partial) const {
 
 void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps) {
     if (use_mmap) {
+        uint64_t t0 = ggml_time_us();
         mappings.reserve(files.size());
         mmaps_used.reserve(files.size());
         for (const auto & file : files) {
@@ -1446,6 +1447,8 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
             }
             mappings.emplace_back(std::move(mapping));
         }
+        uint64_t t1 = ggml_time_us();
+        fprintf(stderr, "DEBUG LOAD: mmap creation took %.2f ms\n", (t1 - t0) / 1000.0);
 
         // Apply memory advice based on ffn_mode
         // Use static flags to avoid applying twice (model loads twice: metadata + tensor data)
@@ -1454,6 +1457,7 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
 
         if (ffn_mode == FFN_ZERO_CPU && !ffn_zero_cpu_advice_applied) {
             ffn_zero_cpu_advice_applied = true;
+            uint64_t t_madv_start = ggml_time_us();
             // FFN-ZERO-CPU: Drop only FFN weight pages from OS page cache.
             // We iterate through the weights_map and apply MADV_DONTNEED to
             // the specific file offset ranges that contain FFN weights.
@@ -1496,6 +1500,8 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
             }
             fprintf(stderr, "FFN-ZERO-CPU: dropped %zu FFN ranges (%.1f MB) from page cache\n",
                 ffn_ranges_applied, (double)ffn_bytes_dropped / (1024.0*1024.0));
+            uint64_t t_madv_end = ggml_time_us();
+            fprintf(stderr, "DEBUG LOAD: MADV_DONTNEED took %.2f ms\n", (t_madv_end - t_madv_start) / 1000.0);
         } else if (ffn_mode == FFN_LOCAL && !ffn_ram_cpu_advice_applied) {
             ffn_ram_cpu_advice_applied = true;
             // FFN-RAM-CPU: Pre-warm the mmap pages into RAM by reading them.

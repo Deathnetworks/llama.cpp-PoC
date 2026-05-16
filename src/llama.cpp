@@ -318,8 +318,6 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         ml.print_info();
         std::unique_ptr<llama_model> model_ptr(llama_model_create(ml, params));
 
-
-
         bool ok = llama_prepare_model_devices(params, model_ptr.get());
         if (!ok) {
             return {-1, nullptr};
@@ -340,8 +338,14 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         model->hparams.vocab_only = params.vocab_only;
         model->hparams.no_alloc   = params.no_alloc;
 
+        // DEBUG: timing for model loading phases
+        uint64_t t_load_start = ggml_time_us();
+
         try {
+            uint64_t t0 = ggml_time_us();
             model->load_hparams(ml);
+            uint64_t t1 = ggml_time_us();
+            fprintf(stderr, "DEBUG LOAD: load_hparams took %.2f ms\n", (t1 - t0) / 1000.0);
         } catch(const std::exception & e) {
             throw std::runtime_error("error loading model hyperparameters: " + std::string(e.what()));
         }
@@ -349,13 +353,19 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             throw std::runtime_error("CLIP cannot be used as main model, use it with --mmproj instead");
         }
         try {
+            uint64_t t0 = ggml_time_us();
             model->load_vocab(ml);
+            uint64_t t1 = ggml_time_us();
+            fprintf(stderr, "DEBUG LOAD: load_vocab took %.2f ms\n", (t1 - t0) / 1000.0);
         } catch(const std::exception & e) {
             throw std::runtime_error("error loading model vocabulary: " + std::string(e.what()));
         }
 
+        uint64_t t0 = ggml_time_us();
         model->load_stats(ml);
         model->print_info();
+        uint64_t t1 = ggml_time_us();
+        fprintf(stderr, "DEBUG LOAD: load_stats+print_info took %.2f ms\n", (t1 - t0) / 1000.0);
 
         if (ffn_mode == FFN_LOCAL) {
             LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled — FFN weights routed to CPU, graph scheduler handles cross-backend copies\n", __func__);
@@ -366,12 +376,21 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             return {0, model_ptr.release()};
         }
 
-        LLAMA_LOG_INFO("%s: DEBUG: loading tensors...\n", __func__);
+        fprintf(stderr, "DEBUG LOAD: loading tensors (this is the slow part for MoE)...\n");
+        uint64_t t_tensors_start = ggml_time_us();
         if (!model->load_tensors(ml)) {
             LLAMA_LOG_ERROR("%s: DEBUG: load_tensors failed\n", __func__);
             return {-2, nullptr};
         }
-        LLAMA_LOG_INFO("%s: DEBUG: tensors loaded successfully\n", __func__);
+        uint64_t t_tensors_end = ggml_time_us();
+        fprintf(stderr, "DEBUG LOAD: load_tensors took %.2f ms (%.2f seconds)\n",
+            (t_tensors_end - t_tensors_start) / 1000.0,
+            (t_tensors_end - t_tensors_start) / 1000000.0);
+
+        uint64_t t_load_end = ggml_time_us();
+        fprintf(stderr, "DEBUG LOAD: total model load took %.2f ms (%.2f seconds)\n",
+            (t_load_end - t_load_start) / 1000.0,
+            (t_load_end - t_load_start) / 1000000.0);
 
         return {0, model_ptr.release()};
     } catch (const std::exception & err) {
