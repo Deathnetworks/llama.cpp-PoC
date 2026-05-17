@@ -205,12 +205,16 @@ struct cli_context {
 
         // Check if chat templates were initialized properly
         if (!chat_params.tmpls) {
-            LOG_WRN("%s: chat templates not initialized, using raw prompt\n", __func__);
+            SRV_WRN("%s: chat templates not initialized, using raw prompt\n", __func__);
             common_chat_params result;
-            result.prompt = "";
+            // Build a simple prompt from the messages JSON
+            std::string prompt;
             for (const auto & msg : messages) {
-                result.prompt += msg.content + "\n";
+                if (msg.contains("content") && msg["content"].is_string()) {
+                    prompt += msg["content"].get<std::string>() + "\n";
+                }
             }
+            result.prompt = prompt;
             return result;
         }
 

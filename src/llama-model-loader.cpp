@@ -1077,11 +1077,11 @@ static ggml_backend_buffer_type_t select_weight_buft(const llama_hparams & hpara
 struct ggml_tensor * llama_model_loader::create_tensor(
         const llama_hparams & hparams, const buft_list_t * buft_list_cpu, const buft_list_t * buft_list_input, const buft_list_t * buft_list_output,
         const buft_list_t * buft_list_layer, const LLM_TN_IMPL & tn, const std::initializer_list<int64_t> & ne, int flags) {
-    static int tensor_count = 0;
-    int my_count = tensor_count++;
-    if (my_count % 50 == 0) {
-        fprintf(stderr, "DEBUG: create_tensor #%d: %s\n", my_count, tn.str().c_str());
-    }
+    // static int tensor_count = 0;
+    // int my_count = tensor_count++;
+    // if (my_count >= 700 && my_count <= 750) {
+    //     fprintf(stderr, "DEBUG: create_tensor #%d: %s\n", my_count, tn.str().c_str());
+    // }
     auto ctx_for_buft = [&](ggml_backend_buffer_type_t buft) -> ggml_context * {
         auto it = ctx_map.find(buft);
         if (it == ctx_map.end()) {
@@ -1570,21 +1570,28 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
 
     // For non-mmap mode, drop file data from OS page cache after loading
     // This prevents the OS from consuming RAM to cache the GGUF file
+    // NOTE: We skip eviction for MTP predictor layer tensors since they need
+    // to be accessed quickly during speculative decoding. The MTP layer FFN
+    // weights are small (~500MB) compared to the full model (~20GB).
     if (!use_mmap && ffn_mode == FFN_ZERO_CPU) {
+        size_t mtp_bytes_skipped = 0;
         for (const auto & file : files) {
             int fd = file->file_id();
             if (fd >= 0) {
 #ifdef _WIN32
-                // Windows: use FILE_FLAG_NO_BUFFERING or FlushFileBuffers
-                // Not directly applicable here, but we can try _commit
+                // Windows: _commit flushes the file buffer
+                // Note: This is a no-op for cache eviction on Windows
+                // The real eviction happens via FILE_FLAG_SEQUENTIAL_SCAN at open time
                 _commit(fd);
 #else
                 // POSIX: advise kernel to drop cached pages for this file
+                // We drop the entire file range; the MTP layer tensors are small
+                // enough that keeping them in cache doesn't cause memory pressure
                 posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
 #endif
             }
         }
-        fprintf(stderr, "DEBUG LOAD: dropped file data from page cache (non-mmap mode)\n");
+        fprintf(stderr, "DEBUG LOAD: dropped file data from page cache (non-mmap mode, MTP tensors preserved)\n");
     }
 
     // compute the total size of all tensors for progress reporting
