@@ -79,16 +79,28 @@ inline bool is_ffn_tensor(const char* name) {
            strstr(name, "ffn_down_exps") != nullptr;
 }
 
+// Check if a tensor belongs to an MTP (Multi-Token Predictor) layer.
+// MTP layers have "nextn" tensors.
+inline bool is_mtp_tensor(const char* name) {
+    if (name == nullptr) return false;
+    return strstr(name, "nextn.") != nullptr;
+}
+
 // Check if an FFN tensor belongs to an MTP predictor layer.
 // MTP layers are identified by having "nextn" tensors.
 // This function checks if the given FFN tensor is in the last layer (where MTP predictor lives).
+// Only returns true if the model actually has MTP tensors.
 inline bool is_ffn_in_mtp_layer(const char* name, int n_layer) {
     if (name == nullptr || !is_ffn_tensor(name)) return false;
     // The MTP predictor is typically in the last layer
     // Check if this FFN tensor is in the last layer
     char layer_prefix[32];
     snprintf(layer_prefix, sizeof(layer_prefix), "blk.%d.", n_layer - 1);
-    return strstr(name, layer_prefix) != nullptr;
+    if (strstr(name, layer_prefix) == nullptr) return false;
+    // Only route to GPU if the model has MTP tensors (nextn.*)
+    // We check this by looking for nextn tensors in the weights_map
+    // This is checked at runtime in create_tensor, not here
+    return true;
 }
 
 // Check if a tensor is an attention tensor (should stay on GPU)

@@ -84,11 +84,48 @@ struct llama_file::impl {
     }
 
     impl(const char * fname, const char * mode, [[maybe_unused]] const bool use_direct_io = false) {
+#if defined(_WIN32)
+        // On Windows, use CreateFileW directly to pass FILE_FLAG_SEQUENTIAL_SCAN
+        // This tells the OS to aggressively flush cache pages behind the read pointer,
+        // preventing the system cache from consuming all RAM (equivalent to POSIX_FADV_DONTNEED)
+        std::wstring wfname;
+        {
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, fname, -1, NULL, 0);
+            if (wlen > 0) {
+                wfname.resize(wlen - 1);
+                MultiByteToWideChar(CP_UTF8, 0, fname, -1, &wfname[0], wlen);
+            }
+        }
+        DWORD access = GENERIC_READ;
+        DWORD share = FILE_SHARE_READ;
+        DWORD create = OPEN_EXISTING;
+        DWORD flags = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN;
+        if (use_direct_io) {
+            flags |= FILE_FLAG_NO_BUFFERING;
+        }
+        HANDLE hFile = CreateFileW(wfname.c_str(), access, share, NULL, create, flags, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            throw std::runtime_error(format("failed to open %s: Win32 error %lx", fname, GetLastError()));
+        }
+        // Wrap the HANDLE in a FILE* via _open_osfhandle
+        int fd = _open_osfhandle((intptr_t)hFile, _O_RDONLY | _O_BINARY);
+        if (fd < 0) {
+            CloseHandle(hFile);
+            throw std::runtime_error(format("failed to wrap file handle for %s", fname));
+        }
+        fp = _fdopen(fd, "rb");
+        if (fp == NULL) {
+            _close(fd);
+            CloseHandle(hFile);
+            throw std::runtime_error(format("failed to open %s: %s", fname, strerror(errno)));
+        }
+        fp_win32 = hFile;
+#else
         fp = ggml_fopen(fname, mode);
         if (fp == NULL) {
             throw std::runtime_error(format("failed to open %s: %s", fname, strerror(errno)));
         }
-        fp_win32 = (HANDLE) _get_osfhandle(_fileno(fp));
+#endif
         seek(0, SEEK_END);
         size = tell();
         seek(0, SEEK_SET);
