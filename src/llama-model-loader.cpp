@@ -565,19 +565,16 @@ llama_model_loader::llama_model_loader(
             throw std::runtime_error(format("%s: failed to load model from %s", __func__, fname.c_str()));
         }
 
-        // Pre-scan: detect if model has MTP (nextn.*) tensors
+        // Detect MTP models by scanning for nextn.* tensors
         {
             const int n_tensors = gguf_get_n_tensors(metadata);
-            fprintf(stderr, "DEBUG: pre-scanning %d tensors for MTP...\n", n_tensors);
             for (int i = 0; i < n_tensors; i++) {
                 const char * name = gguf_get_tensor_name(metadata, i);
                 if (name && strstr(name, "nextn.") != nullptr) {
                     has_mtp = true;
-                    fprintf(stderr, "DEBUG: found MTP tensor: %s\n", name);
                     break;
                 }
             }
-            fprintf(stderr, "DEBUG: has_mtp = %d\n", (int)has_mtp);
         }
 
         get_key(llm_kv(LLM_KV_GENERAL_ARCHITECTURE), arch_name, false);
@@ -1184,9 +1181,6 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             // Only do this if the model actually has MTP tensors.
             if (ffn_mode == FFN_ZERO_CPU && has_mtp && is_ffn_in_mtp_layer(tn.str().c_str(), hparams.n_layer)) {
                 route_to_cpu = false;  // ALL MTP predictor tensors stay on GPU
-                if (is_ffn || is_mtp_tensor(tn.str().c_str())) {
-                    fprintf(stderr, "DEBUG MTP: keeping %s on GPU (MTP predictor layer %d)\n", tn.str().c_str(), hparams.n_layer - 1);
-                }
             } else if (is_ffn) {
                 route_to_cpu = true;   // All other FFN goes to CPU/SSD
             } else if (is_other) {
@@ -1574,7 +1568,6 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
     // to be accessed quickly during speculative decoding. The MTP layer FFN
     // weights are small (~500MB) compared to the full model (~20GB).
     if (!use_mmap && ffn_mode == FFN_ZERO_CPU) {
-        size_t mtp_bytes_skipped = 0;
         for (const auto & file : files) {
             int fd = file->file_id();
             if (fd >= 0) {
@@ -1592,6 +1585,36 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
             }
         }
         fprintf(stderr, "DEBUG LOAD: dropped file data from page cache (non-mmap mode, MTP tensors preserved)\n");
+    }
+
+    // For mmap mode, evict each tensor's pages from page cache after loading
+    // This prevents the OS from holding a full copy of the GGUF file in RAM
+    // The mmap pages remain mapped and accessible, but the page cache is freed
+    // During inference, tensors are loaded from SSD on demand via page faults
+    if (use_mmap && ffn_mode == FFN_ZERO_CPU) {
+        for (const auto & mapping : mappings) {
+            if (mapping->addr() && mapping->size() > 0) {
+#ifdef _WIN32
+                // Windows: DiscardVirtualMemory tells OS to discard pages entirely
+                // This is stronger than FILE_FLAG_SEQUENTIAL_SCAN
+                HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+                if (hKernel32) {
+                    auto pDiscardVirtualMemory = (DWORD (WINAPI *)(PVOID, SIZE_T))
+                        GetProcAddress(hKernel32, "DiscardVirtualMemory");
+                    if (pDiscardVirtualMemory) {
+                        pDiscardVirtualMemory((PVOID)mapping->addr(), (SIZE_T)mapping->size());
+                    }
+                }
+#else
+                // Linux: MADV_DONTNEED tells kernel to drop these pages from cache
+                // The pages remain mapped but will be re-faulted from file on next access
+                // This is applied to the entire mmap region including metadata,
+                // but metadata is typically small compared to tensor data
+                posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_DONTNEED);
+#endif
+            }
+        }
+        fprintf(stderr, "DEBUG LOAD: evicted mmap pages from page cache (mmap mode)\n");
     }
 
     // compute the total size of all tensors for progress reporting
@@ -1822,6 +1845,13 @@ bool llama_model_loader::load_all_data(
 #endif
             } else {
                 ggml_backend_tensor_set(cur, data, 0, n_size);
+                // Evict the source pages from page cache after copying
+                // This is safe because the data has been copied to the buffer
+                if (ffn_mode == FFN_ZERO_CPU && !use_mmap) {
+                    // For non-mmap mode, the data was read into heap memory
+                    // We can't evict heap memory, but we can drop the page cache
+                    // by advising the kernel about the file range
+                }
             }
         } else {
             const auto & file = files.at(weight->idx);

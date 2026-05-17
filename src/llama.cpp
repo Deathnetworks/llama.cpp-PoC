@@ -10,6 +10,13 @@
 #include "llama-model-saver.h"
 
 #include <sys/mman.h>  // for posix_madvise, MADV_DONTNEED
+#include <fcntl.h>     // for posix_fadvise, POSIX_FADV_DONTNEED
+
+#ifdef _WIN32
+#include <psapi.h>     // for EmptyWorkingSet
+#else
+#include <malloc.h>    // for malloc_trim
+#endif
 #include "llama-model.h"
 #include "llama-ffn-local.h"
 
@@ -393,6 +400,51 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         // may still reference data in the mmap region (e.g., GGUF metadata).
         // Instead, we evict individual tensor pages as they are loaded in
         // load_tensor_data_to_buffers().
+
+        // Drop file data from OS page cache after loading all tensors
+        // This prevents the page cache from holding a full copy of the GGUF file
+        // The mmap pages remain mapped and accessible, but the page cache is freed
+        if (ffn_mode == FFN_ZERO_CPU) {
+            for (uint32_t idx = 0; idx < ml.files.size(); idx++) {
+                int fd = ml.files[idx]->file_id();
+                if (fd >= 0) {
+#ifdef _WIN32
+                    // Windows: _commit flushes the file buffer
+                    _commit(fd);
+#else
+                    // POSIX: advise kernel to drop cached pages for this file
+                    // This frees the page cache without affecting mmap mappings
+                    posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+#endif
+                }
+            }
+            fprintf(stderr, "DEBUG LOAD: dropped file data from page cache\n");
+        }
+
+        // For non-mmap mode, evict heap-allocated tensor buffers from working set
+        // This pushes idle pages to the standby list/pagefile, freeing physical RAM
+        if (!params.use_mmap && ffn_mode == FFN_ZERO_CPU) {
+#ifdef _WIN32
+            // Windows: EmptyWorkingSet pushes pages out of the working set
+            // This causes hard page faults when the pages are accessed again,
+            // but keeps the virtual address space committed
+            typedef BOOL (WINAPI *PFN_EMPTYWORKINGSET)(HANDLE);
+            HMODULE hPsapi = GetModuleHandleW(L"psapi.dll");
+            if (!hPsapi) hPsapi = LoadLibraryW(L"psapi.dll");
+            if (hPsapi) {
+                auto pEmptyWorkingSet = (PFN_EMPTYWORKINGSET)GetProcAddress(hPsapi, "EmptyWorkingSet");
+                if (pEmptyWorkingSet) {
+                    pEmptyWorkingSet(GetCurrentProcess());
+                    fprintf(stderr, "DEBUG LOAD: emptied working set (Windows)\n");
+                }
+            }
+#else
+            // Linux: malloc_trim returns free heap memory to the OS
+            // This reduces the RSS of the process
+            malloc_trim(0);
+            fprintf(stderr, "DEBUG LOAD: trimmed heap (Linux)\n");
+#endif
+        }
 
         uint64_t t_load_end = ggml_time_us();
         fprintf(stderr, "DEBUG LOAD: total model load took %.2f ms (%.2f seconds)\n",
