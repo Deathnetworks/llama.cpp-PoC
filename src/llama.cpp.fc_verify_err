@@ -8,8 +8,6 @@
 #include "llama-vocab.h"
 #include "llama-model-loader.h"
 #include "llama-model-saver.h"
-
-#include <sys/mman.h>  // for posix_madvise, MADV_DONTNEED
 #include "llama-model.h"
 #include "llama-ffn-local.h"
 
@@ -292,17 +290,9 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             default: break;
         }
         if (ffn_mode == FFN_LOCAL) {
-            static bool ffn_ram_cpu_msg_shown = false;
-            if (!ffn_ram_cpu_msg_shown) {
-                fprintf(stderr, "FNN-RAM-CPU: mode=%d\n", params.ffn_split_mode);
-                ffn_ram_cpu_msg_shown = true;
-            }
+            fprintf(stderr, "FNN-RAM-CPU: mode=%d\n", params.ffn_split_mode);
         } else if (ffn_mode == FFN_ZERO_CPU) {
-            static bool ffn_zero_cpu_msg_shown = false;
-            if (!ffn_zero_cpu_msg_shown) {
-                fprintf(stderr, "FNN-ZERO-CPU: mode=%d — FFN weights mmap'd from SSD\n", params.ffn_split_mode);
-                ffn_zero_cpu_msg_shown = true;
-            }
+            fprintf(stderr, "FNN-ZERO-CPU: mode=%d — FFN weights mmap'd from SSD\n", params.ffn_split_mode);
         }
         {
             const char * env = getenv("LLAMA_SPLIT_OTHER");
@@ -319,6 +309,8 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
 
         ml.print_info();
         std::unique_ptr<llama_model> model_ptr(llama_model_create(ml, params));
+
+
 
         bool ok = llama_prepare_model_devices(params, model_ptr.get());
         if (!ok) {
@@ -340,14 +332,8 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         model->hparams.vocab_only = params.vocab_only;
         model->hparams.no_alloc   = params.no_alloc;
 
-        // DEBUG: timing for model loading phases
-        uint64_t t_load_start = ggml_time_us();
-
         try {
-            uint64_t t0 = ggml_time_us();
             model->load_hparams(ml);
-            uint64_t t1 = ggml_time_us();
-            fprintf(stderr, "DEBUG LOAD: load_hparams took %.2f ms\n", (t1 - t0) / 1000.0);
         } catch(const std::exception & e) {
             throw std::runtime_error("error loading model hyperparameters: " + std::string(e.what()));
         }
@@ -355,19 +341,13 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             throw std::runtime_error("CLIP cannot be used as main model, use it with --mmproj instead");
         }
         try {
-            uint64_t t0 = ggml_time_us();
             model->load_vocab(ml);
-            uint64_t t1 = ggml_time_us();
-            fprintf(stderr, "DEBUG LOAD: load_vocab took %.2f ms\n", (t1 - t0) / 1000.0);
         } catch(const std::exception & e) {
             throw std::runtime_error("error loading model vocabulary: " + std::string(e.what()));
         }
 
-        uint64_t t0 = ggml_time_us();
         model->load_stats(ml);
         model->print_info();
-        uint64_t t1 = ggml_time_us();
-        fprintf(stderr, "DEBUG LOAD: load_stats+print_info took %.2f ms\n", (t1 - t0) / 1000.0);
 
         if (ffn_mode == FFN_LOCAL) {
             LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled — FFN weights routed to CPU, graph scheduler handles cross-backend copies\n", __func__);
@@ -378,26 +358,12 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             return {0, model_ptr.release()};
         }
 
-        fprintf(stderr, "DEBUG LOAD: loading tensors (this is the slow part for MoE)...\n");
-        uint64_t t_tensors_start = ggml_time_us();
+        LLAMA_LOG_INFO("%s: DEBUG: loading tensors...\n", __func__);
         if (!model->load_tensors(ml)) {
             LLAMA_LOG_ERROR("%s: DEBUG: load_tensors failed\n", __func__);
             return {-2, nullptr};
         }
-        uint64_t t_tensors_end = ggml_time_us();
-        fprintf(stderr, "DEBUG LOAD: load_tensors took %.2f ms (%.2f seconds)\n",
-            (t_tensors_end - t_tensors_start) / 1000.0,
-            (t_tensors_end - t_tensors_start) / 1000000.0);
-
-        // NOTE: We do NOT evict the entire mmap region here because the model
-        // may still reference data in the mmap region (e.g., GGUF metadata).
-        // Instead, we evict individual tensor pages as they are loaded in
-        // load_tensor_data_to_buffers().
-
-        uint64_t t_load_end = ggml_time_us();
-        fprintf(stderr, "DEBUG LOAD: total model load took %.2f ms (%.2f seconds)\n",
-            (t_load_end - t_load_start) / 1000.0,
-            (t_load_end - t_load_start) / 1000000.0);
+        LLAMA_LOG_INFO("%s: DEBUG: tensors loaded successfully\n", __func__);
 
         return {0, model_ptr.release()};
     } catch (const std::exception & err) {

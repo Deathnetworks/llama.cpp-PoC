@@ -112,7 +112,11 @@ struct task_result_state {
     const std::string oai_resp_message_id;
     std::string oai_resp_fc_id; // function call ID for current args delta
 
-    task_result_state(const common_chat_parser_params & chat_parser_params);
+    task_result_state(const common_chat_parser_params & chat_parser_params)
+        : chat_parser_params(chat_parser_params)
+        , oai_resp_id("resp_" + random_string())
+        , oai_resp_reasoning_id("rs_" + random_string())
+        , oai_resp_message_id("msg_" + random_string()) {}
 
     // parse partial tool calls and update the internal state
     common_chat_msg update_chat_msg(
