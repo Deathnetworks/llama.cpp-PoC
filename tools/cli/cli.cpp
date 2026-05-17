@@ -203,6 +203,17 @@ struct cli_context {
         auto meta = ctx_server.get_meta();
         auto & chat_params = meta.chat_params;
 
+        // Check if chat templates were initialized properly
+        if (!chat_params.tmpls) {
+            LOG_WRN("%s: chat templates not initialized, using raw prompt\n", __func__);
+            common_chat_params result;
+            result.prompt = "";
+            for (const auto & msg : messages) {
+                result.prompt += msg.content + "\n";
+            }
+            return result;
+        }
+
         auto caps = common_chat_templates_get_caps(chat_params.tmpls.get());
 
         common_chat_templates_inputs inputs;

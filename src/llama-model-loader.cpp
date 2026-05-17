@@ -568,13 +568,16 @@ llama_model_loader::llama_model_loader(
         // Pre-scan: detect if model has MTP (nextn.*) tensors
         {
             const int n_tensors = gguf_get_n_tensors(metadata);
+            fprintf(stderr, "DEBUG: pre-scanning %d tensors for MTP...\n", n_tensors);
             for (int i = 0; i < n_tensors; i++) {
                 const char * name = gguf_get_tensor_name(metadata, i);
                 if (name && strstr(name, "nextn.") != nullptr) {
                     has_mtp = true;
+                    fprintf(stderr, "DEBUG: found MTP tensor: %s\n", name);
                     break;
                 }
             }
+            fprintf(stderr, "DEBUG: has_mtp = %d\n", (int)has_mtp);
         }
 
         get_key(llm_kv(LLM_KV_GENERAL_ARCHITECTURE), arch_name, false);
@@ -1074,6 +1077,11 @@ static ggml_backend_buffer_type_t select_weight_buft(const llama_hparams & hpara
 struct ggml_tensor * llama_model_loader::create_tensor(
         const llama_hparams & hparams, const buft_list_t * buft_list_cpu, const buft_list_t * buft_list_input, const buft_list_t * buft_list_output,
         const buft_list_t * buft_list_layer, const LLM_TN_IMPL & tn, const std::initializer_list<int64_t> & ne, int flags) {
+    static int tensor_count = 0;
+    int my_count = tensor_count++;
+    if (my_count % 50 == 0) {
+        fprintf(stderr, "DEBUG: create_tensor #%d: %s\n", my_count, tn.str().c_str());
+    }
     auto ctx_for_buft = [&](ggml_backend_buffer_type_t buft) -> ggml_context * {
         auto it = ctx_map.find(buft);
         if (it == ctx_map.end()) {
@@ -1477,14 +1485,14 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
         static bool ffn_zero_cpu_advice_applied = false;
         static bool ffn_ram_cpu_advice_applied = false;
 
+        // NOTE: MADV_DONTNEED eviction is done in llama_model_load() after
+        // load_tensors() completes, not here. This is because the model
+        // construction code still needs access to the mmap region during loading.
+        /*
         if (ffn_mode == FFN_ZERO_CPU && !ffn_zero_cpu_advice_applied) {
             ffn_zero_cpu_advice_applied = true;
             uint64_t t_madv_start = ggml_time_us();
             // FFN-ZERO-CPU: Drop only FFN weight pages from OS page cache.
-            // We iterate through the weights_map and apply MADV_DONTNEED to
-            // the specific file offset ranges that contain FFN weights.
-            // This forces page faults from SSD only for FFN computation,
-            // while attention weights remain cached for fast GPU access.
             size_t ffn_ranges_applied = 0;
             size_t ffn_bytes_dropped = 0;
             for (const auto & it : weights_map) {
@@ -1524,7 +1532,7 @@ void llama_model_loader::init_mappings(bool prefetch, llama_mlocks * mlock_mmaps
                 ffn_ranges_applied, (double)ffn_bytes_dropped / (1024.0*1024.0));
             uint64_t t_madv_end = ggml_time_us();
             fprintf(stderr, "DEBUG LOAD: MADV_DONTNEED took %.2f ms\n", (t_madv_end - t_madv_start) / 1000.0);
-        } else if (ffn_mode == FFN_LOCAL && !ffn_ram_cpu_advice_applied) {
+        } else */ if (ffn_mode == FFN_LOCAL && !ffn_ram_cpu_advice_applied) {
             ffn_ram_cpu_advice_applied = true;
             // FFN-RAM-CPU: Pre-warm the mmap pages into RAM by reading them.
             // This ensures the weights are in RAM before inference starts,
@@ -1781,12 +1789,6 @@ bool llama_model_loader::load_all_data(
                 mmap_used.first  = std::min(mmap_used.first,  weight->offs);
                 mmap_used.second = std::max(mmap_used.second, weight->offs + n_size);
 
-                // On Windows, unlock the mmap pages from the working set after loading
-                // This prevents the OS from keeping all mapped pages in RAM
-#if defined(_WIN32) && defined(_WIN64)
-                // VirtualUnlock removes pages from the working set (but keeps them mapped)
-                VirtualUnlock((LPVOID)data, n_size);
-#endif
             } else {
                 ggml_backend_tensor_set(cur, data, 0, n_size);
             }

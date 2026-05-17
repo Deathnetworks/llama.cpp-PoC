@@ -8,6 +8,8 @@
 #include "llama-vocab.h"
 #include "llama-model-loader.h"
 #include "llama-model-saver.h"
+
+#include <sys/mman.h>  // for posix_madvise, MADV_DONTNEED
 #include "llama-model.h"
 #include "llama-ffn-local.h"
 
@@ -386,6 +388,30 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
         fprintf(stderr, "DEBUG LOAD: load_tensors took %.2f ms (%.2f seconds)\n",
             (t_tensors_end - t_tensors_start) / 1000.0,
             (t_tensors_end - t_tensors_start) / 1000000.0);
+
+        // After model is fully loaded, evict mmap pages from page cache
+        // This is safe now because all tensor data has been copied to GPU/CPU buffers
+        // and the model no longer references the mmap region for tensor data
+        if (ffn_mode == FFN_ZERO_CPU && params.use_mmap) {
+            fprintf(stderr, "DEBUG LOAD: evicting mmap pages from page cache...\n");
+            for (const auto & mapping : ml.mappings) {
+                if (mapping->addr() && mapping->size() > 0) {
+#ifdef _WIN32
+                    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+                    if (hKernel32) {
+                        auto pDiscardVirtualMemory = (DWORD (WINAPI *)(PVOID, SIZE_T))
+                            GetProcAddress(hKernel32, "DiscardVirtualMemory");
+                        if (pDiscardVirtualMemory) {
+                            pDiscardVirtualMemory((PVOID)mapping->addr(), (SIZE_T)mapping->size());
+                        }
+                    }
+#else
+                    posix_madvise(mapping->addr(), mapping->size(), POSIX_MADV_DONTNEED);
+#endif
+                }
+            }
+            fprintf(stderr, "DEBUG LOAD: mmap eviction complete\n");
+        }
 
         uint64_t t_load_end = ggml_time_us();
         fprintf(stderr, "DEBUG LOAD: total model load took %.2f ms (%.2f seconds)\n",
