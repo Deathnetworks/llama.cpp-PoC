@@ -3,6 +3,10 @@
 #include "llama.h"
 #include "llama-ext.h"
 #include "llama-cparams.h"
+#include "llama-ffn-local.h"
+
+#include <unordered_map>
+#include <string>
 #include "llama-graph.h"
 #include "llama-adapter.h"
 #include "llama-impl.h"
@@ -211,6 +215,13 @@ struct llama_context {
             int64_t                          ndata_in_loop,
             int64_t                          t_loop_start);
 
+    // [EXPERIMENTAL] Streaming engine state (zero-RAM mode)
+    // These must be public so llama_init_from_model() can set them
+    std::unordered_map<std::string, ffn_weight_offset> * ffn_weight_map = nullptr;
+    ffn_async_buffer * ffn_async  = nullptr;
+    int                ffn_n_layers = 0;
+    std::string        ffn_model_path;
+
 private:
     //
     // output
@@ -244,7 +255,7 @@ public:
 
     bool set_sampler(llama_seq_id seq_id, llama_sampler * sampler);
 
-private:
+private:  // private methods
     llm_graph_params graph_params(
                         llm_graph_result * res,
                       const llama_ubatch & ubatch,
@@ -364,6 +375,8 @@ private:
     // FNN-RAM-CPU split mode
     ffn_mode_t ffn_mode = FFN_GPU;
     split_other_t split_other = SPLIT_OTHER_GPU;
+    bool use_resize = false; // [EXPERIMENTAL] Use Resizable BAR for zero-copy CPU-GPU transfers
+    bool zero_ram = false;   // [EXPERIMENTAL] Evict FFN weights after each layer (zero-RAM mode)
 
     // perf
     mutable int64_t t_start_us  = 0;

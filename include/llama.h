@@ -300,6 +300,9 @@ extern "C" {
 
         int32_t ffn_split_mode; // 0=GPU-ONLY, 1=FFN on CPU, 2=FFN+other, 3=all non-attention
 
+        bool use_resize; // [EXPERIMENTAL] Use Resizable BAR for zero-copy CPU-GPU transfers (Intel GPU only)
+        bool zero_ram;   // [EXPERIMENTAL] Evict FFN weights after each layer (zero-RAM mode)
+
         // the GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
         int32_t main_gpu;
 
@@ -373,6 +376,9 @@ extern "C" {
         void *              abort_callback_data;
 
         int32_t ffn_split_mode; // 0=GPU-ONLY, 1=FFN on CPU, 2=FFN+other, 3=all non-attention
+
+        bool use_resize; // [EXPERIMENTAL] Use Resizable BAR for zero-copy CPU-GPU transfers (Intel GPU only)
+        bool zero_ram;   // [EXPERIMENTAL] Evict FFN weights after each layer (zero-RAM mode)
 
         // Keep the booleans together and at the end of the struct to avoid misalignment during copy-by-value.
         bool embeddings;  // if true, extract embeddings (together with logits)

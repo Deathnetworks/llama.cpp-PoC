@@ -1523,6 +1523,8 @@ struct llama_model_params common_model_params_to_llama(common_params & params) {
     mparams.main_gpu        = params.main_gpu;
     mparams.split_mode      = params.split_mode;
     mparams.ffn_split_mode  = params.ffn_split_mode;
+    mparams.use_resize     = params.use_resize;
+    mparams.zero_ram       = params.zero_ram;
     mparams.tensor_split    = params.tensor_split;
     mparams.use_mmap        = params.use_mmap;
     mparams.use_direct_io   = params.use_direct_io;
@@ -1586,6 +1588,8 @@ struct llama_context_params common_context_params_to_llama(const common_params &
     cparams.type_k = params.cache_type_k;
     cparams.type_v = params.cache_type_v;
     cparams.ffn_split_mode = params.ffn_split_mode;
+    cparams.use_resize    = params.use_resize;
+    cparams.zero_ram      = params.zero_ram;
 
     return cparams;
 }

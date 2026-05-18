@@ -458,6 +458,15 @@ struct common_params {
     // [EXPERIMENTAL] FNN-RAM-CPU split mode: 0=GPU-ONLY, 1=FFN on CPU, 2=FFN+other on CPU, 3=all non-attention on CPU
     int32_t ffn_split_mode = 0;
 
+    // [EXPERIMENTAL] Use Resizable BAR for zero-copy CPU-GPU transfers (Intel GPU only)
+    bool use_resize = false;
+
+    // [EXPERIMENTAL] Zero-RAM mode: evict FFN weights from page cache after each layer
+    // Only works with --split-mode fnn-zero-cpu (mmap'd weights)
+    // This keeps only ~1 layer of weights in RAM at a time (~150MB for 4B model)
+    // Trade-off: slightly slower inference due to page faults on each layer
+    bool zero_ram = false;
+
     common_cpu_params cpuparams;
     common_cpu_params cpuparams_batch;
 

@@ -582,6 +582,12 @@ struct llama_model {
     int64_t t_load_us  = 0;
     int64_t t_start_us = 0;
 
+    // [EXPERIMENTAL] Streaming engine state for zero-RAM mode
+    // Populated during model load, used by context during inference
+    std::unordered_map<std::string, ffn_weight_offset> * ffn_weight_map = nullptr;
+    int ffn_n_layers = 0;
+    std::string ffn_model_path;  // Path to GGUF file for streaming reads
+
     explicit llama_model(const llama_model_params & params);
     virtual ~llama_model();
 

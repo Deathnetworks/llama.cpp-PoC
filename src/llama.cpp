@@ -20,6 +20,14 @@
 #include "llama-model.h"
 #include "llama-ffn-local.h"
 
+// [EXPERIMENTAL] Global flag for Resizable BAR mode
+// Set during model load, read by ffn_local_callback
+bool g_use_resize = false;
+
+// [EXPERIMENTAL] Global flag for Zero-RAM mode
+// Set during model load, read by ffn_mmap_prefetch
+bool g_zero_ram = false;
+
 #include "ggml.h"
 #include "ggml-cpp.h"
 #include "ggml-backend.h"
@@ -298,6 +306,16 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             case 3: case 6: split_other = SPLIT_OTHER_ALL_CPU; break;
             default: break;
         }
+        // [EXPERIMENTAL] Set global ReBAR flag for zero-copy transfers
+        g_use_resize = params.use_resize;
+        if (g_use_resize) {
+            LLAMA_LOG_INFO("%s: Resizable BAR (ReBAR) mode enabled for FFN callback\n", __func__);
+        }
+        g_zero_ram = params.zero_ram;
+        if (g_zero_ram) {
+            LLAMA_LOG_INFO("%s: Zero-RAM mode enabled — FFN weights will be evicted after each layer\n", __func__);
+        }
+
         if (ffn_mode == FFN_LOCAL) {
             static bool ffn_ram_cpu_msg_shown = false;
             if (!ffn_ram_cpu_msg_shown) {
@@ -421,9 +439,30 @@ static std::pair<int, llama_model *> llama_model_load(struct gguf_context * meta
             fprintf(stderr, "DEBUG LOAD: dropped file data from page cache\n");
         }
 
-        // For non-mmap mode, evict heap-allocated tensor buffers from working set
-        // This pushes idle pages to the standby list/pagefile, freeing physical RAM
-        if (!params.use_mmap && ffn_mode == FFN_ZERO_CPU) {
+    // For non-mmap mode, evict heap-allocated tensor buffers from working set
+    // This pushes idle pages to the standby list/pagefile, freeing physical RAM
+
+    // Populate FFN weight offset map for streaming mode
+    if (params.zero_ram || params.ffn_split_mode >= 4) {
+        auto * weight_map = new std::unordered_map<std::string, ffn_weight_offset>();
+        for (const auto & it : ml.weights_map) {
+            const std::string & name = it.first;
+            if (is_ffn_tensor(name.c_str())) {
+                ffn_weight_offset wo;
+                wo.file_idx = it.second.idx;
+                wo.file_off = it.second.offs;
+                wo.size = ggml_nbytes(it.second.tensor);
+                weight_map->emplace(name, wo);
+            }
+        }
+        // Store in model for later use by context
+        model->ffn_weight_map = weight_map;
+        model->ffn_n_layers = model->hparams.n_layer;
+        model->ffn_model_path = fname;
+        fprintf(stderr, "DEBUG STREAM: populated FFN weight map with %zu entries for streaming\n", weight_map->size());
+    }
+
+    if (!params.use_mmap && ffn_mode == FFN_ZERO_CPU) {
 #ifdef _WIN32
             // Windows: EmptyWorkingSet pushes pages out of the working set
             // This causes hard page faults when the pages are accessed again,

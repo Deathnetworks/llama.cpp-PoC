@@ -965,6 +965,9 @@ llama_model::~llama_model() {
     for (auto * lora : loras) {
         delete lora;
     }
+    // Clean up streaming weight map
+    delete ffn_weight_map;
+    ffn_weight_map = nullptr;
 }
 
 void llama_model_base::load_stats(llama_model_loader & ml) {
@@ -2121,6 +2124,8 @@ llama_model_params llama_model_default_params() {
         /*.n_gpu_layers                =*/ -1,
         /*.split_mode                  =*/ LLAMA_SPLIT_MODE_LAYER,
         /*.ffn_split_mode              =*/ 0,
+        /*.use_resize                  =*/ false,
+        /*.zero_ram                    =*/ false,
         /*.main_gpu                    =*/ 0,
         /*.tensor_split                =*/ nullptr,
         /*.progress_callback           =*/ nullptr,

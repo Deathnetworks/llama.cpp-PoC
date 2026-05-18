@@ -8,9 +8,13 @@ This fork of llama.cpp implements **FFN-to-CPU offload**, which reduces GPU VRAM
 
 | Mode | Split Mode Flag | Description |
 |------|----------------|-------------|
-| **GPU-ONLY** | `--split-mode local-gpu` (default) | All weights on GPU. Maximum performance. |
-| **FNN-RAM-CPU** | `--split-mode local-ssd` | FFN weights on CPU, attention on GPU. Reduces VRAM. |
-| **GPU-SSD** | (future) | Zero-copy mmap from SSD. Minimal RAM usage. |
+| **GPU-ONLY** | `--split-mode gpu-only` (default) | All weights on GPU. Maximum performance. |
+| **FNN-RAM-CPU** | `--split-mode fnn-ram-cpu` | FFN weights on CPU RAM, attention on GPU. Reduces VRAM. |
+| **FNN-RAM-CPU-OTHER** | `--split-mode fnn-ram-cpu-other` | FFN + SSM/other on CPU RAM, embedding on GPU. |
+| **FNN-RAM-CPU-ALL** | `--split-mode fnn-ram-cpu-all` | All non-attention weights on CPU RAM. Max VRAM savings. |
+| **FNN-ZERO-CPU** | `--split-mode fnn-zero-cpu` | FFN weights mmap'd from SSD. Minimal RAM usage. |
+| **FNN-ZERO-CPU-OTHER** | `--split-mode fnn-zero-cpu-other` | FFN + SSM/other mmap'd from SSD. |
+| **FNN-ZERO-CPU-ALL** | `--split-mode fnn-zero-cpu-all` | All non-attention weights mmap'd from SSD. |
 
 ### How It Works
 
@@ -68,13 +72,13 @@ cmake --build . --target llama-cli llama-server -j$(nproc)
 ./llama-cli -m model.gguf -p "Hello" -n 128
 
 # FNN-RAM-CPU mode (FFN on CPU, attention on GPU)
-./llama-cli -m model.gguf -p "Hello" -n 128 --split-mode local-ssd
+./llama-cli -m model.gguf -p "Hello" -n 128 --split-mode fnn-ram-cpu
 
 # With Q8 KV cache (saves more VRAM)
-./llama-cli -m model.gguf -p "Hello" -n 128 --split-mode local-ssd -ctk q8_0 -ctv q8_0
+./llama-cli -m model.gguf -p "Hello" -n 128 --split-mode fnn-ram-cpu -ctk q8_0 -ctv q8_0
 
 # Server mode
-./llama-server -m model.gguf --split-mode local-ssd --port 8080
+./llama-server -m model.gguf --split-mode fnn-ram-cpu --port 8080
 ```
 
 ## Build Configurations
@@ -143,17 +147,20 @@ cmake .. \
 
 | Flag | Description |
 |------|-------------|
-| `--split-mode local-gpu` | All weights on GPU (default) |
-| `--split-mode local-ssd` | FFN weights on CPU, attention on GPU |
+| `--split-mode gpu-only` | All weights on GPU (default) |
+| `--split-mode fnn-ram-cpu` | FFN weights on CPU, attention on GPU |
+| `--split-mode fnn-zero-cpu` | FFN weights mmap'd from SSD (zero-copy) |
 | `--split-mode none` | Single GPU, no splitting |
 | `--split-mode layer` | Split layers across multiple GPUs |
 | `--split-mode row` | Split rows across multiple GPUs |
+| `--use-resize` | Use Resizable BAR for zero-copy transfers (Intel GPU) |
 
 ### FNN-RAM-CPU Specific Flags
 
 | Flag | Description |
 |------|-------------|
-| `--split-mode local-ssd` | Enable FFN-to-CPU offload |
+| `--split-mode fnn-ram-cpu` | Enable FFN-to-CPU offload |
+| `--split-mode fnn-zero-cpu` | Enable FFN-to-SSD zero-copy offload |
 | `LLAMA_SPLIT_OTHER=cpu` | Also offload SSM/other tensors to CPU |
 | `--no-mmap` | Load weights directly into RAM (recommended for FNN-RAM-CPU) |
 | `-ctk q8_0 -ctv q8_0` | Q8 KV cache (saves ~50% KV memory) |
@@ -164,7 +171,8 @@ cmake .. \
 
 | Flag | VRAM Savings | Performance Impact |
 |------|-------------|-------------------|
-| `--split-mode local-ssd` | 40-60% (FFN weights) | 60-90% slower |
+| `--split-mode fnn-ram-cpu` | 40-60% (FFN weights) | 60-90% slower |
+| `--split-mode fnn-zero-cpu` | 50-70% (FFN weights) | 80-95% slower |
 | `-ctk q8_0 -ctv q8_0` | ~50% KV cache | Minimal |
 | `-c 4096` | ~75% KV vs 128K | None |
 | `--no-mmap` | None | Faster loading |
@@ -175,7 +183,7 @@ cmake .. \
 **For 2B-4B models (FFN on CPU is fast enough):**
 ```bash
 llama-cli -m model.gguf \
-    --split-mode local-ssd \
+    --split-mode fnn-ram-cpu \
     --no-mmap \
     -c 4096 \
     -n 256
@@ -184,7 +192,7 @@ llama-cli -m model.gguf \
 **For 9B-27B models (keep FFN on GPU, reduce KV):**
 ```bash
 llama-cli -m model.gguf \
-    --split-mode local-gpu \
+    --split-mode gpu-only \
     -ctk q8_0 -ctv q8_0 \
     -c 4096 \
     -n 256
@@ -193,7 +201,7 @@ llama-cli -m model.gguf \
 **For MoE models (FFN on CPU is FASTER):**
 ```bash
 llama-cli -m model.gguf \
-    --split-mode local-ssd \
+    --split-mode fnn-ram-cpu \
     --no-mmap \
     -c 4096 \
     -n 256
@@ -202,7 +210,7 @@ llama-cli -m model.gguf \
 **For maximum VRAM reduction (all small tensors on CPU):**
 ```bash
 LLAMA_SPLIT_OTHER=cpu llama-cli -m model.gguf \
-    --split-mode local-ssd \
+    --split-mode fnn-ram-cpu \
     --no-mmap \
     -c 2048 \
     -ctk q8_0 -ctv q8_0 \
@@ -215,7 +223,7 @@ LLAMA_SPLIT_OTHER=cpu llama-cli -m model.gguf \
 # Start server with FNN-RAM-CPU
 ./llama-server \
     -m model.gguf \
-    --split-mode local-ssd \
+    --split-mode fnn-ram-cpu \
     --no-mmap \
     -c 4096 \
     --host 0.0.0.0 \
@@ -254,7 +262,7 @@ The OpenCL backend doesn't support all operations. Use `--no-kv-offload` or swit
 ### Out of memory
 - Reduce context length (`-c 4096`)
 - Use Q8 KV cache (`-ctk q8_0 -ctv q8_0`)
-- Use FNN-RAM-CPU mode (`--split-mode local-ssd`)
+- Use FNN-RAM-CPU mode (`--split-mode fnn-ram-cpu`)
 - Reduce GPU layers (`--n-gpu-layers 20`)
 
 ### Slow inference on FNN-RAM-CPU
@@ -336,8 +344,202 @@ The current approach uses standard GGML ops (norm, matmul, silu, mul, add) with 
 This is a private fork. For upstream llama.cpp contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Key files modified:
-- `src/llama-model-loader.cpp` — Tensor routing to CPU buffer
+- `src/llama-model-loader.cpp` — Tensor routing to CPU buffer, memory eviction
 - `src/llama-graph.cpp` — FFN graph construction
-- `src/llama-ffn-local.h` — Routing predicates and split modes
+- `src/llama-ffn-local.h` — Routing predicates, split modes, MTP detection
+- `src/llama-ffn-local.cpp` — CPU FFN compute, callback with USM path
 - `ggml/src/ggml-opencl/ggml-opencl.cpp` — `cpy_tensor` implementation
-- `src/llama.cpp` — Mode initialization
+- `src/llama.cpp` — Mode initialization, global ReBAR flag
+- `src/llama-context.cpp` — Context split mode initialization
+- `src/llama-context.h` — Context split mode storage
+- `common/arg.cpp` — CLI argument parsing
+- `common/common.cpp` — Parameter conversion
+- `common/common.h` — Parameter struct definitions
+- `include/llama.h` — Public API parameter structs
+
+---
+
+# FFN-ZERO-CPU Mode (Phase 3)
+
+## Overview
+
+FFN-ZERO-CPU mode extends FNN-RAM-CPU by using **mmap'd weights from SSD** instead of loading all FFN weights into RAM. This minimizes system RAM usage to near-zero for the weights, while keeping attention on GPU.
+
+### Three Zero-CPU Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| **FNN-RAM-CPU** | `--split-mode fnn-ram-cpu` | FFN weights loaded into CPU RAM |
+| **FNN-ZERO-CPU** | `--split-mode fnn-zero-cpu` | FFN weights mmap'd from SSD (minimal RAM) |
+| **FNN-ZERO-CPU-OTHER** | `--split-mode fnn-zero-cpu-other` | FFN + SSM/other mmap'd from SSD |
+| **FNN-ZERO-CPU-ALL** | `--split-mode fnn-zero-cpu-all` | All non-attention weights mmap'd from SSD |
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  FFN-ZERO-CPU FLOW                           │
+│                                                              │
+│  ┌──────────┐     ┌──────────┐     ┌──────────┐             │
+│  │   SSD    │────▶│  mmap()  │────▶│ CPU FFN  │             │
+│  │  (GGUF)  │     │ (kernel  │     │ (compute)│             │
+│  │          │     │  page    │     │          │             │
+│  │          │     │  cache)  │     │          │             │
+│  └──────────┘     └──────────┘     └──────────┘             │
+│       │                │                │                    │
+│       │         MADV_DONTNEED          │                    │
+│       │         (evict after           │                    │
+│       │          loading)              │                    │
+│       │                │                │                    │
+│       ▼                ▼                ▼                    │
+│  Weights stay    Pages evicted    FFN runs on               │
+│  on SSD, not     from page cache  CPU with                  │
+│  consuming RAM   after loading    direct mmap               │
+│                                                              │
+│  RAM usage: ~500 MB (attention + KV cache only)             │
+│  VRAM usage: ~1.5 GB (attention weights + KV cache)         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Memory Eviction
+
+After model loading, the following eviction steps are performed:
+
+1. **`posix_fadvise(POSIX_FADV_DONTNEED)`** — Drops file data from OS page cache
+2. **`posix_madvise(POSIX_MADV_DONTNEED)`** — Marks mmap pages as reclaimable
+3. **`malloc_trim(0)`** — Returns free heap memory to the OS (Linux)
+4. **`EmptyWorkingSet`** — Pushes heap pages to standby list (Windows)
+5. **`DiscardVirtualMemory`** — Discards mmap pages entirely (Windows)
+
+This ensures that after loading, the system RAM usage is minimized. The OS can still page-fault weights from SSD when needed during inference.
+
+### MTP (Multi-Token Predictor) Support
+
+FFN-ZERO-CPU mode automatically detects MTP models (tensors with `nextn.` prefix) and keeps ALL tensors in the MTP predictor layer on GPU. This is necessary because:
+
+1. MTP runs during speculative decoding and needs low-latency access
+2. If MTP FFN weights are on CPU/SSD, prediction latency reduces speculative decoding effectiveness
+3. The MTP layer is small (~500MB) compared to the full model
+
+### Command-Line Reference
+
+| Flag | Description |
+|------|-------------|
+| `--split-mode fnn-zero-cpu` | FFN weights mmap'd from SSD |
+| `--split-mode fnn-zero-cpu-other` | FFN + SSM/other mmap'd from SSD |
+| `--split-mode fnn-zero-cpu-all` | All non-attention weights mmap'd from SSD |
+| `--use-resize` | Use Resizable BAR for zero-copy CPU-GPU transfers (Intel GPU only) |
+| `--no-mmap` | Load weights directly into RAM (disables mmap) |
+
+### Recommended Configurations
+
+**For minimal RAM usage (4B model):**
+```bash
+llama-cli -m model.gguf \
+    --split-mode fnn-zero-cpu \
+    -c 4096 \
+    -n 256 \
+    --jinja
+```
+
+**For minimal RAM usage with MTP:**
+```bash
+llama-cli -m model.MTP.gguf \
+    --split-mode fnn-zero-cpu \
+    --spec-type draft-mtp \
+    --spec-draft-n-max 6 \
+    -c 4096 \
+    -n 256 \
+    --jinja
+```
+
+**For Intel Arc with Resizable BAR:**
+```bash
+llama-cli -m model.gguf \
+    --split-mode fnn-zero-cpu \
+    --use-resize \
+    -c 4096 \
+    -n 256 \
+    --jinja
+```
+
+**For streaming FFN weights from SSD (minimal RAM):**
+```bash
+llama-cli -m model.gguf \
+    --split-mode fnn-zero-cpu \
+    --stream \
+    -c 4096 \
+    -n 256 \
+    --jinja
+```
+
+**For maximum VRAM reduction (all small tensors on CPU):**
+```bash
+llama-cli -m model.gguf \
+    --split-mode fnn-zero-cpu-all \
+    -c 2048 \
+    -ctk q8_0 -ctv q8_0 \
+    -n 256 \
+    --jinja
+```
+
+### Benchmark Results
+
+| Model | Mode | Prompt t/s | Gen t/s | RAM Usage | VRAM Usage |
+|-------|------|-----------|---------|-----------|------------|
+| Qwen3.5-2B | GPU-ONLY | 108.9 | 52.4 | ~2.0 GB | ~2.0 GB |
+| Qwen3.5-2B | FNN-RAM-CPU | 54.1 | 16.2 | ~2.5 GB | ~0.7 GB |
+| Qwen3.5-2B | FNN-ZERO-CPU | 10.1 | 2.6 | ~0.5 GB | ~0.7 GB |
+| Qwen3.5-4B-MTP | GPU-ONLY | 62.7 | 37.8 | ~3.5 GB | ~3.5 GB |
+| Qwen3.5-4B-MTP | FNN-RAM-CPU | 28.7 | 12.3 | ~4.0 GB | ~1.3 GB |
+| Qwen3.5-4B-MTP | FNN-ZERO-CPU | 28.3 | 12.1 | ~0.8 GB | ~1.3 GB |
+| Qwen3.5-4B-MTP | FNN-ZERO-CPU+MTP | 35.3 | 11.6 | ~1.3 GB | ~1.8 GB |
+| Qwen3.6-35B-MTP | GPU-ONLY | 29.4 | 11.4 | ~22 GB | ~22 GB |
+| Qwen3.6-35B-MTP | FNN-ZERO-CPU+MTP | 40.4 | 8.6 | ~2.0 GB | ~4.0 GB |
+
+**Notes:**
+- FNN-ZERO-CPU uses mmap from SSD, so RAM usage is minimal
+- MTP predictor layer stays on GPU, adding ~500MB VRAM
+- Qwen3.6-35B with FNN-ZERO-CPU+MTP is faster than GPU-ONLY because it avoids VRAM spill
+- RAM usage with eviction: ~500MB-2GB depending on model size
+
+### Resizable BAR (ReBAR) Mode
+
+`--use-resize` enables zero-copy CPU-GPU tensor transfers using Intel's Resizable BAR technology. This eliminates the need for explicit `clEnqueueReadBuffer`/`clEnqueueWriteBuffer` calls during inference.
+
+**How it works:**
+1. With ReBAR, the entire GPU VRAM is mapped into the CPU's physical address space
+2. The CPU can write directly to GPU VRAM using standard memory operations
+3. This eliminates driver submission overhead for each transfer
+
+**Requirements:**
+- Intel Arc GPU with ReBAR enabled in BIOS
+- Linux: `cl_intel_unified_shared_memory` extension
+- Windows: Intel Level Zero driver with ReBAR support
+
+**Expected improvement:** 2-5x reduction in transfer overhead for CPU-GPU interleaved inference.
+
+**Environment variables:**
+```bash
+# Enable immediate command lists (reduces submission overhead)
+export SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1
+```
+
+### Troubleshooting
+
+#### High RAM usage after loading
+Run `echo 3 | sudo tee /proc/sys/vm/drop_caches` to drop the page cache. The eviction code should do this automatically, but manual clearing may be needed.
+
+#### Slow inference with FNN-ZERO-CPU
+- Ensure model is on SSD, not HDD
+- Use `--no-mmap` to load weights into RAM if you have sufficient RAM
+- Install OpenBLAS for faster CPU compute: `sudo apt install libopenblas-dev`
+
+#### MTP produces gibberish
+- Ensure MTP predictor layer tensors stay on GPU (automatic with FNN-ZERO-CPU)
+- Use `--spec-type draft-mtp` with `--spec-draft-n-max 6`
+
+#### Chat template crash
+- Use `--jinja` flag for models with embedded chat templates
+- Use `--reasoning off` to disable thinking mode
+- Some models require `--single-turn` for non-interactive use

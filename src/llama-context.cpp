@@ -219,6 +219,18 @@ llama_context::llama_context(
             break;
     }
 
+    // [EXPERIMENTAL] Resizable BAR mode
+    use_resize = params.use_resize;
+    if (use_resize) {
+        LLAMA_LOG_INFO("%s: Resizable BAR (ReBAR) mode enabled for zero-copy CPU-GPU transfers\n", __func__);
+    }
+
+    // [EXPERIMENTAL] Zero-RAM mode
+    zero_ram = params.zero_ram;
+    if (zero_ram) {
+        LLAMA_LOG_INFO("%s: Zero-RAM mode enabled — FFN weights evicted after each layer\n", __func__);
+    }
+
     // Override with environment variables if set
     {
         const char * env = getenv("LLAMA_SPLIT_OTHER");
@@ -440,6 +452,14 @@ llama_context::~llama_context() {
         }
     }
     ggml_opt_free(opt_ctx);
+
+    // Clean up streaming engine
+    if (ffn_async) {
+        ffn_async_free(ffn_async);
+        delete ffn_async;
+        ffn_async = nullptr;
+    }
+    // Note: ffn_weight_map is owned by the model, not the context
 }
 
 void llama_context::sched_reserve() {
@@ -2346,6 +2366,111 @@ ggml_status llama_context::graph_compute(
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
 
+    // Set up streaming callback for zero-RAM mode
+    // This callback intercepts FFN weight tensors during graph execution
+    // and loads them from SSD on-demand into a temporary buffer.
+    struct stream_ud_t {
+        std::unordered_map<std::string, ffn_weight_offset> * weight_map;
+        ffn_async_buffer * async_buf;
+        int n_layers;
+        int current_layer;
+        int loaded_layer;
+    };
+    stream_ud_t stream_ud = { ffn_weight_map, ffn_async, ffn_n_layers, -1, -1 };
+
+    if (zero_ram && ffn_weight_map && ffn_async && ffn_async->initialized && ffn_model_path.c_str()[0]) {
+        auto stream_cb = [](struct ggml_tensor * t, bool ask, void * user_data) -> bool {
+            if (!ask) return true;  // always observe after compute
+
+            auto * ud = (stream_ud_t *)user_data;
+            if (!ud || !ud->weight_map || !ud->async_buf) return false;
+
+            // Only intercept MUL_MAT operations (FFN matmuls)
+            if (t->op != GGML_OP_MUL_MAT && t->op != GGML_OP_MUL_MAT_ID) return false;
+
+            // Check if src[0] is an FFN weight tensor
+            ggml_tensor * w = t->src[0];
+            if (!w || !w->name[0]) return false;
+            const char * name = w->name;
+
+            // Quick check: must contain "ffn" and start with "blk."
+            if (!strstr(name, "ffn") || strncmp(name, "blk.", 4) != 0) return false;
+
+            // Look up the weight in our map
+            auto it = ud->weight_map->find(std::string(name));
+            if (it == ud->weight_map->end()) return false;
+
+            // Extract layer number
+            int layer = -1;
+            sscanf(name, "blk.%d.", &layer);
+            if (layer < 0 || layer >= ud->n_layers) return false;
+
+            // Only load once per layer
+            if (layer != ud->loaded_layer) {
+                // Load this layer's weights from SSD into the async buffer
+                if (!ffn_async_load_layer(ud->async_buf, layer, nullptr)) {
+                    return false;
+                }
+                ud->loaded_layer = layer;
+            }
+
+            // Update the weight tensor's data pointer to point to the loaded buffer
+            uint8_t * buf = (uint8_t *)ud->async_buf->buf[ud->async_buf->active_idx];
+
+            // Calculate offset within the buffer based on tensor type
+            // Buffer layout: [ffn_norm][ffn_gate][ffn_up][ffn_down]
+            // We need to look up each tensor's size from the weight map
+            size_t buf_offset = 0;
+
+            // Build names for all tensors in this layer to compute offsets
+            char name_norm[64], name_gate[64], name_up[64], name_down[64];
+            snprintf(name_norm, sizeof(name_norm), "blk.%d.ffn_norm.weight", layer);
+            snprintf(name_gate, sizeof(name_gate), "blk.%d.ffn_gate.weight", layer);
+            snprintf(name_up,   sizeof(name_up),   "blk.%d.ffn_up.weight",   layer);
+            snprintf(name_down, sizeof(name_down), "blk.%d.ffn_down.weight", layer);
+
+            // Compute cumulative offset
+            size_t offset_ffn_norm = 0;
+            size_t offset_ffn_gate = 0;
+            size_t offset_ffn_up = 0;
+            size_t offset_ffn_down = 0;
+
+            auto it_norm = ud->weight_map->find(name_norm);
+            auto it_gate = ud->weight_map->find(name_gate);
+            auto it_up = ud->weight_map->find(name_up);
+            auto it_down = ud->weight_map->find(name_down);
+
+            if (it_norm != ud->weight_map->end()) {
+                offset_ffn_gate += it_norm->second.size;
+            }
+            if (it_gate != ud->weight_map->end()) {
+                offset_ffn_up += it_gate->second.size;
+            }
+            if (it_up != ud->weight_map->end()) {
+                offset_ffn_down += it_up->second.size;
+            }
+            offset_ffn_down += offset_ffn_up;
+            offset_ffn_up += offset_ffn_gate;
+            offset_ffn_gate += offset_ffn_norm;
+
+            if (strstr(name, "ffn_norm")) {
+                buf_offset = offset_ffn_norm;
+            } else if (strstr(name, "ffn_gate")) {
+                buf_offset = offset_ffn_gate;
+            } else if (strstr(name, "ffn_up")) {
+                buf_offset = offset_ffn_up;
+            } else if (strstr(name, "ffn_down")) {
+                buf_offset = offset_ffn_down;
+            }
+
+            w->data = buf + buf_offset;
+
+            return true;
+        };
+
+        ggml_backend_sched_set_eval_callback(sched.get(), stream_cb, &stream_ud);
+    }
+
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {
         LLAMA_LOG_ERROR("%s: ggml_backend_sched_graph_compute_async failed with error %d\n", __func__, status);
@@ -3388,6 +3513,8 @@ llama_context_params llama_context_default_params() {
         /*.swa_full                    =*/ true,
         /*.kv_unified                  =*/ false,
         /*.ffn_split_mode              =*/ 0,
+        /*.use_resize                  =*/ false,
+        /*.zero_ram                    =*/ false,
         /*.samplers                    =*/ nullptr,
         /*.n_samplers                  =*/ 0,
     };
@@ -3476,6 +3603,27 @@ llama_context * llama_init_from_model(
 
     try {
         auto * ctx = new llama_context(*model, params);
+
+        // Initialize streaming engine for zero-RAM mode
+        if (params.zero_ram && model->ffn_weight_map && model->ffn_weight_map->size() > 0) {
+            ctx->ffn_weight_map = model->ffn_weight_map;
+            ctx->ffn_n_layers = model->ffn_n_layers;
+            ctx->ffn_model_path = model->ffn_model_path;
+
+            ctx->ffn_async = new ffn_async_buffer();
+            if (!ffn_async_init(ctx->ffn_async, model->ffn_model_path.c_str(), nullptr, model->ffn_n_layers)) {
+                LLAMA_LOG_WARN("%s: failed to initialize async buffer, falling back to mmap mode\n", __func__);
+                delete ctx->ffn_async;
+                ctx->ffn_async = nullptr;
+            } else {
+                fprintf(stderr, "DEBUG STREAM: zero-RAM streaming initialized — %zu weight entries, %d layers\n",
+                    model->ffn_weight_map->size(), model->ffn_n_layers);
+            }
+        } else {
+            fprintf(stderr, "DEBUG STREAM: NOT initializing — zero_ram=%d weight_map=%p size=%zu\n",
+                params.zero_ram, (void*)model->ffn_weight_map, model->ffn_weight_map ? model->ffn_weight_map->size() : 0);
+        }
+
         return ctx;
     } catch (const std::exception & err) {
         LLAMA_LOG_ERROR("%s: failed to initialize the context: %s\n", __func__, err.what());

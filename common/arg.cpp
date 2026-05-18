@@ -2430,6 +2430,27 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_SPLIT_MODE"));
     add_opt(common_arg(
+        {"--use-resize"},
+        "use Resizable BAR (ReBAR) for zero-copy CPU-GPU tensor transfers (Intel GPU only)",
+        [](common_params & params) {
+            params.use_resize = true;
+        }
+    ).set_env("LLAMA_ARG_USE_RESIZE"));
+    add_opt(common_arg(
+        {"--zero-ram"},
+        "zero-RAM mode: evict FFN weights from page cache after each layer (fnn-zero-cpu only)",
+        [](common_params & params) {
+            params.zero_ram = true;
+        }
+    ).set_env("LLAMA_ARG_ZERO_RAM"));
+    add_opt(common_arg(
+        {"--stream"},
+        "stream FFN weights from SSD per-layer (zero-RAM, fnn-zero-cpu only)",
+        [](common_params & params) {
+            params.zero_ram = true;
+        }
+    ).set_env("LLAMA_ARG_STREAM"));
+    add_opt(common_arg(
         {"-ts", "--tensor-split"}, "N0,N1,N2,...",
         "fraction of the model to offload to each GPU, comma-separated list of proportions, e.g. 3,1",
         [](common_params & params, const std::string & value) {
