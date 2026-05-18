@@ -1,0 +1,474 @@
+ggml_opencl: ReBAR status [ENABLED] - max_alloc=1024 MB, threshold=256 MB
+
+Loading model... |FNN-ZERO-CPU: mode=4 — FFN weights mmap'd from SSD
+-DEBUG LOAD: load_hparams took 0.06 ms
+\|/-DEBUG LOAD: load_vocab took 448.59 ms
+DEBUG LOAD: load_stats+print_info took 0.04 ms
+DEBUG LOAD: loading tensors (this is the slow part for MoE)...
+\|DEBUG LOAD: dropped file data from page cache (non-mmap mode, MTP tensors preserved)
+DEBUG LOAD: load_tensors took 178.95 ms (0.18 seconds)
+DEBUG LOAD: dropped file data from page cache
+DEBUG STREAM: populated FFN weight map with 96 entries for streaming
+DEBUG LOAD: trimmed heap (Linux)
+DEBUG LOAD: total model load took 627.85 ms (0.63 seconds)
+/DEBUG STREAM: async buffer initialized — fd=3, buffer_size=256 MB
+DEBUG STREAM: zero-RAM streaming initialized — 96 weight entries, 33 layers
+-DEBUG LOAD: load_hparams took 0.07 ms
+\|/-DEBUG LOAD: load_vocab took 400.84 ms
+DEBUG LOAD: load_stats+print_info took 0.03 ms
+DEBUG LOAD: loading tensors (this is the slow part for MoE)...
+DEBUG LOAD: dropped file data from page cache (non-mmap mode, MTP tensors preserved)
+\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|DEBUG LOAD: load_tensors took 6590.37 ms (6.59 seconds)
+/-DEBUG LOAD: dropped file data from page cache
+DEBUG STREAM: populated FFN weight map with 96 entries for streaming
+DEBUG LOAD: trimmed heap (Linux)
+DEBUG LOAD: total model load took 7189.80 ms (7.19 seconds)
+DEBUG STREAM: async buffer initialized — fd=3, buffer_size=256 MB
+DEBUG STREAM: zero-RAM streaming initialized — 96 weight entries, 33 layers
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+\DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: I/O thread started
+|/-\|/-\|/-\|/-\|/-\|/-\|/-DEBUG STREAM: async buffer initialized — fd=5, buffer_size=256 MB
+DEBUG STREAM: zero-RAM streaming initialized — 96 weight entries, 33 layers
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+\DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: I/O thread started
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+|/-\|/-\|/-\|/-\|/-\|/-\ 
+
+
+▄▄ ▄▄
+██ ██
+██ ██  ▀▀█▄ ███▄███▄  ▀▀█▄    ▄████ ████▄ ████▄
+██ ██ ▄█▀██ ██ ██ ██ ▄█▀██    ██    ██ ██ ██ ██
+██ ██ ▀█▄██ ██ ██ ██ ▀█▄██ ██ ▀████ ████▀ ████▀
+                                    ██    ██
+                                    ▀▀    ▀▀
+
+build      : b9200-8c7d58669
+model      : Qwen3.5-4B-Q4_K_M.MTP.gguf
+modalities : text
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+  /regen              regenerate the last response
+  /clear              clear the chat history
+  /read <file>        add a text file
+  /glob <pattern>     add text files using globbing pattern
+
+
+> What is the capital of France?
+
+|DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+-\|/-\|/-\|/-\|/-\|/-\|/DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+-DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+\|/-\|/-\|/-\|/-\|/-\|/-DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+\DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+ [Start thinking]
+ThinkingDEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ Process:
+
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+1. DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ **AnalyzeDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ the Request:**DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ TheDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ user is askingDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ aDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ simple factualDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ question: "DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+What is theDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ capital of FranceDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+?"
+
+2DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+.  **DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+Retrieve Knowledge:**DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ Access generalDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ knowledge about geographyDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ and countries.DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+
+   DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ *   CountryDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+: France
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+    *  DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ Capital: ParisDEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=3 buf=0x78bab2a13000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+
+
+3.DEBUG STREAM: pread fd=3 buf=0x78baa2a11000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+DEBUG STREAM: pread fd=5 buf=0x78ba7af77000 size=45895680 offset=555563328
+DEBUG STREAM: pread returned 45895680 errno=0
+DEBUG STREAM: layer 0 loaded 45895680 bytes from offset 555563328 (block_size=45895680)
+DEBUG STREAM: pre-loaded layer 0 into buffer A
+ 
+
+[ Prompt: 3.3 t/s | Generation: 1.0 t/s ]
+
+Exiting...

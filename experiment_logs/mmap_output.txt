@@ -1,0 +1,60 @@
+ggml_opencl: ReBAR status [ENABLED] - max_alloc=1024 MB, threshold=256 MB
+
+Loading model... |FNN-ZERO-CPU: mode=4 — FFN weights mmap'd from SSD
+-\DEBUG LOAD: load_hparams took 0.08 ms
+|/-\|/DEBUG LOAD: load_vocab took 601.72 ms
+DEBUG LOAD: load_stats+print_info took 0.05 ms
+DEBUG LOAD: loading tensors (this is the slow part for MoE)...
+-\DEBUG LOAD: dropped file data from page cache (non-mmap mode, MTP tensors preserved)
+DEBUG LOAD: load_tensors took 210.69 ms (0.21 seconds)
+|DEBUG LOAD: dropped file data from page cache
+DEBUG STREAM: populated FFN weight map with 96 entries for streaming
+DEBUG LOAD: trimmed heap (Linux)
+DEBUG LOAD: total model load took 968.64 ms (0.97 seconds)
+/DEBUG STREAM: NOT initializing — zero_ram=0 weight_map=0x5686963955b0 size=96
+-\|DEBUG LOAD: load_hparams took 0.06 ms
+/-\|/DEBUG LOAD: load_vocab took 551.75 ms
+DEBUG LOAD: load_stats+print_info took 0.04 ms
+DEBUG LOAD: loading tensors (this is the slow part for MoE)...
+-\|/DEBUG LOAD: mmap creation took 375.56 ms
+DEBUG LOAD: evicted mmap pages from page cache (mmap mode)
+-\|/-\|/DEBUG LOAD: load_tensors took 1205.85 ms (1.21 seconds)
+-\DEBUG LOAD: dropped file data from page cache
+DEBUG STREAM: populated FFN weight map with 96 entries for streaming
+DEBUG LOAD: total model load took 1898.95 ms (1.90 seconds)
+DEBUG STREAM: NOT initializing — zero_ram=0 weight_map=0x56869a5a7e30 size=96
+|/-\|/-\|/-\|/-\|/-\ 
+
+
+▄▄ ▄▄
+██ ██
+██ ██  ▀▀█▄ ███▄███▄  ▀▀█▄    ▄████ ████▄ ████▄
+██ ██ ▄█▀██ ██ ██ ██ ▄█▀██    ██    ██ ██ ██ ██
+██ ██ ▀█▄██ ██ ██ ██ ▀█▄██ ██ ▀████ ████▀ ████▀
+                                    ██    ██
+                                    ▀▀    ▀▀
+
+build      : b9200-8c7d58669
+model      : Qwen3.5-4B-Q4_K_M.MTP.gguf
+modalities : text
+
+available commands:
+  /exit or Ctrl+C     stop or exit
+  /regen              regenerate the last response
+  /clear              clear the chat history
+  /read <file>        add a text file
+  /glob <pattern>     add text files using globbing pattern
+
+
+> What is the capital of France?
+
+|-\|/-\|/-\|/-\|/-\| [Start thinking]
+ 用户问的是法国的首都。这是一个非常基础且明确的事实性问题。
+
+ 1.  **确认事实**：法国的首都是巴黎（Paris）。
+ 2.  **语言**：用户使用的是中文，因此需要用中文回答。
+ 3.  **简洁性**：直接给出
+
+[ Prompt: 8.5 t/s | Generation: 2.2 t/s ]
+
+Exiting...

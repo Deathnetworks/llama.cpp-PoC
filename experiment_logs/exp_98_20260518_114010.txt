@@ -1,0 +1,9 @@
+ggml_opencl: ReBAR status [ENABLED] - max_alloc=1024 MB, threshold=256 MB
+error while handling argument "--flash-attn": expected value for argument
+
+usage:
+-fa,   --flash-attn [on|off|auto]       set Flash Attention use ('on', 'off', or 'auto', default: 'auto')
+                                        (env: LLAMA_ARG_FLASH_ATTN)
+
+
+to show complete usage, run with -h
