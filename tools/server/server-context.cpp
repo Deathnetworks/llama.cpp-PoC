@@ -750,14 +750,47 @@ private:
             return false;
         }
 
+        // For local MTP models, detect MTP layers and set draft path
+        if (params_base.speculative.draft.mparams.path.empty() &&
+            std::find(params_base.speculative.types.begin(), params_base.speculative.types.end(),
+                      COMMON_SPECULATIVE_TYPE_DRAFT_MTP) != params_base.speculative.types.end()) {
+            // Check if the model file path contains "MTP" (case-insensitive)
+            std::string model_path = params_base.model.path;
+            bool is_mtp = (model_path.find("MTP") != std::string::npos) ||
+                          (model_path.find("mtp") != std::string::npos) ||
+                          (model_path.find(".MTP.") != std::string::npos);
+            // Also check the model's KV metadata for nextn_predict_layers
+            if (!is_mtp) {
+                char buf[256] = {0};
+                if (llama_model_meta_val_str(model_tgt, "qwen35.nextn_predict_layers", buf, sizeof(buf)) == 0) {
+                    int nextn = atoi(buf);
+                    if (nextn > 0) is_mtp = true;
+                }
+            }
+            if (!is_mtp) {
+                char buf[256] = {0};
+                if (llama_model_meta_val_str(model_tgt, "nextn_predict_layers", buf, sizeof(buf)) == 0) {
+                    int nextn = atoi(buf);
+                    if (nextn > 0) is_mtp = true;
+                }
+            }
+            if (is_mtp) {
+                params_base.speculative.draft.mparams.path = params_base.model.path;
+                fprintf(stderr, "SERVER: detected MTP model, set draft path='%s'\n", params_base.model.path.c_str());
+            } else {
+                fprintf(stderr, "SERVER: MTP NOT detected for model '%s'\n", params_base.model.path.c_str());
+            }
+        }
+
         vocab = llama_model_get_vocab(model_tgt);
 
         n_ctx = llama_n_ctx(ctx_tgt);
 
         add_bos_token = llama_vocab_get_add_bos(vocab);
 
+        fprintf(stderr, "LOAD_MODEL: has_dft=%d, draft_path='%s'\n", (int)params_base.speculative.has_dft(), params_base.speculative.draft.mparams.path.c_str());
         if (params_base.speculative.has_dft()) {
-            // TODO speculative: move to common/speculative.cpp?
+            fprintf(stderr, "SERVER: has_dft=1, draft_path='%s'\n", params_base.speculative.draft.mparams.path.c_str());
             const auto & params_spec = params_base.speculative.draft;
 
             SRV_INF("loading draft model '%s'\n", params_spec.mparams.path.c_str());
@@ -790,9 +823,12 @@ private:
             const bool spec_mtp = std::find(params_base.speculative.types.begin(),
                                             params_base.speculative.types.end(),
                                             COMMON_SPECULATIVE_TYPE_DRAFT_MTP) != params_base.speculative.types.end();
+            fprintf(stderr, "SERVER: spec_mtp=%d, types.size=%zu\n", (int)spec_mtp, params_base.speculative.types.size());
             if (spec_mtp) {
                 cparams.ctx_type = LLAMA_CONTEXT_TYPE_MTP;
+                fprintf(stderr, "SERVER: set ctx_type=%d\n", (int)cparams.ctx_type);
             }
+            fprintf(stderr, "SERVER: calling llama_init_from_model with ctx_type=%d\n", (int)cparams.ctx_type);
 
             // note: for small models maybe we can set this to the maximum possible draft from all speculative types
             //       the extra memory for small models is likely negligible?

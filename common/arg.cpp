@@ -465,12 +465,14 @@ void common_params_handle_models(common_params & params, llama_example curr_ex) 
     }
     // when --spec-type mtp is set and no draft model was provided explicitly,
     // fall back to the MTP head discovered alongside the -hf model
+    fprintf(stderr, "ARG: spec_mtp=%d, found_mtp=%d, draft_path='%s', mtp_path='%s'\n", (int)spec_type_draft_mtp, (int)res.found_mtp, params.speculative.draft.mparams.path.c_str(), res.mtp.path.c_str());
     if (spec_type_draft_mtp && res.found_mtp &&
         params.speculative.draft.mparams.path.empty() &&
         params.speculative.draft.mparams.hf_repo.empty() &&
         params.speculative.draft.mparams.url.empty()) {
         params.speculative.draft.mparams.path = res.mtp.path;
     }
+    fprintf(stderr, "ARG: after check, draft_path='%s'\n", params.speculative.draft.mparams.path.c_str());
     common_params_handle_model(params.speculative.draft.mparams, params.hf_token, params.offline);
     common_params_handle_model(params.vocoder.model,             params.hf_token, params.offline);
 }

@@ -24,8 +24,8 @@
 
 static llm_graph_type ctx_type_to_graph_type(llama_context_type ctx_type) {
     switch (ctx_type) {
-        case LLAMA_CONTEXT_TYPE_DEFAULT: return LLM_GRAPH_TYPE_DEFAULT;
-        case LLAMA_CONTEXT_TYPE_MTP    : return LLM_GRAPH_TYPE_DECODER_MTP;
+        case LLAMA_CONTEXT_TYPE_DEFAULT: fprintf(stderr, "GTYPE: DEFAULT->0\n"); return LLM_GRAPH_TYPE_DEFAULT;
+        case LLAMA_CONTEXT_TYPE_MTP    : fprintf(stderr, "GTYPE: MTP->3\n"); return LLM_GRAPH_TYPE_DECODER_MTP;
     }
     throw std::runtime_error("Unsupported ctx type");
 }
@@ -83,6 +83,9 @@ llama_context::llama_context(
     cparams.cb_eval_user_data = params.cb_eval_user_data;
 
     cparams.ctx_type          = params.ctx_type;
+    if (params.ctx_type == LLAMA_CONTEXT_TYPE_MTP) {
+        LLAMA_LOG_INFO("llama_context ctor: ctx_type=MTP, gtype=%d\n", (int)ctx_type_to_graph_type(params.ctx_type));
+    }
 
     // Initialize backend samplers here so they are part of the sampling graph
     // before the reserve passes run later in this function. This avoids a later
@@ -213,6 +216,21 @@ llama_context::llama_context(
             split_other = SPLIT_OTHER_ALL_CPU;
             LLAMA_LOG_INFO("%s: FNN-RAM-CPU mode enabled (all non-attention on CPU)\n", __func__);
             break;
+        case 4:
+            ffn_mode = FFN_ZERO_CPU;
+            split_other = SPLIT_OTHER_GPU;
+            LLAMA_LOG_INFO("%s: FFN-ZERO-CPU mode enabled (FFN weights mmap'd from SSD)\n", __func__);
+            break;
+        case 5:
+            ffn_mode = FFN_ZERO_CPU;
+            split_other = SPLIT_OTHER_CPU;
+            LLAMA_LOG_INFO("%s: FFN-ZERO-CPU mode enabled (FFN+other on CPU)\n", __func__);
+            break;
+        case 6:
+            ffn_mode = FFN_ZERO_CPU;
+            split_other = SPLIT_OTHER_ALL_CPU;
+            LLAMA_LOG_INFO("%s: FFN-ZERO-CPU mode enabled (all non-attention on CPU)\n", __func__);
+            break;
         default:
             ffn_mode = FFN_GPU;
             split_other = SPLIT_OTHER_GPU;
@@ -226,7 +244,12 @@ llama_context::llama_context(
     }
 
     // [EXPERIMENTAL] Zero-RAM mode
+    // Automatically enable for FFN-ZERO-CPU modes (4, 5, 6) unless explicitly disabled
     zero_ram = params.zero_ram;
+    if (!zero_ram && ffn_mode == FFN_ZERO_CPU) {
+        zero_ram = true;
+        LLAMA_LOG_INFO("%s: Zero-RAM mode auto-enabled for FFN-ZERO-CPU\n", __func__);
+    }
     if (zero_ram) {
         LLAMA_LOG_INFO("%s: Zero-RAM mode enabled — FFN weights evicted after each layer\n", __func__);
     }
@@ -1663,6 +1686,7 @@ static bool needs_raw_logits(const llama_ubatch & ubatch, const std::map<llama_s
 }
 
 int llama_context::decode(const llama_batch & batch_inp) {
+    fprintf(stderr, "DECODE: ctx_type=%d, gtype=%d\n", (int)cparams.ctx_type, (int)ctx_type_to_graph_type(cparams.ctx_type));
     // MTP hook batches carry both token (next-token id) and embd (h_pre_norm row),
     // so accept either present rather than requiring exactly one.
     GGML_ASSERT(batch_inp.token || batch_inp.embd);
@@ -1826,6 +1850,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
         ggml_status status;
 
         const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status);
+        if (cparams.ctx_type == LLAMA_CONTEXT_TYPE_MTP) {
+            LLAMA_LOG_INFO("MTP decode: ctx_type=%d, gtype=%d\n", (int)cparams.ctx_type, (int)ctx_type_to_graph_type(cparams.ctx_type));
+        }
 
         if (!res) {
             // the last ubatch failed or was aborted -> remove all positions of that ubatch from the memory module
@@ -3601,11 +3628,22 @@ llama_context * llama_init_from_model(
     }
 
 
-    try {
-        auto * ctx = new llama_context(*model, params);
+// MTP draft contexts need all weights on GPU — disable FFN offloading
+        llama_context_params ctx_params = params;
+        fprintf(stderr, "MTP_DRAFT: ctx_type=%d\n", (int)params.ctx_type);
+        if (params.ctx_type == LLAMA_CONTEXT_TYPE_MTP) {
+            ctx_params.ffn_split_mode = 0; // GPU-ONLY
+            ctx_params.zero_ram = false;
+            fprintf(stderr, "MTP_DRAFT: MTP confirmed\n");
+        }
+        try {
+            auto * ctx = new llama_context(*model, ctx_params);
+            fprintf(stderr, "MTP_DRAFT: ctx created\n");
 
         // Initialize streaming engine for zero-RAM mode
-        if (params.zero_ram && model->ffn_weight_map && model->ffn_weight_map->size() > 0) {
+        // Skip for MTP draft contexts — they need all weights on GPU for fast speculative decoding
+        if (params.zero_ram && model->ffn_weight_map && model->ffn_weight_map->size() > 0
+            && params.ctx_type != LLAMA_CONTEXT_TYPE_MTP) {
             ctx->ffn_weight_map = model->ffn_weight_map;
             ctx->ffn_n_layers = model->ffn_n_layers;
             ctx->ffn_model_path = model->ffn_model_path;

@@ -13,10 +13,19 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
+// io_uring support is handled by CMake (HAS_IO_URING defined via target_compile_definitions)
+// When HAS_IO_URING is not defined, it defaults to 0
+#ifndef HAS_IO_URING
+#define HAS_IO_URING 0
+#endif
+#if HAS_IO_URING
+#include <liburing.h>
+#endif
 #else
 #include <windows.h>
+#include <io.h>
 #endif
-
 // ── Aligned buffer allocation ─────────────────────────────────────────────
 
 static void* aligned_alloc_4k(size_t size) {
@@ -197,6 +206,66 @@ bool ffn_async_load_layer(ffn_async_buffer* ab, int layer, const ffn_mmap_t* ffn
     }
 
     return false;
+}
+
+// Load layer N's weights from SSD using pread() into a specific buffer
+// This is the streaming version that reads directly from the GGUF file
+// Uses pread() as fallback; io_uring_prep_read_fixed() when liburing available
+bool ffn_async_load_layer_pread(ffn_async_buffer* ab, int layer,
+                                 const std::unordered_map<std::string, ffn_weight_offset>* weight_map,
+                                 int buf_idx) {
+    if (!ab || !ab->initialized || layer < 0 || !weight_map) return false;
+    if (ab->fd < 0) return false;
+    if (buf_idx < 0 || buf_idx >= 2) return false;
+
+    char name_gate[64], name_up[64], name_down[64];
+    snprintf(name_gate, sizeof(name_gate), "blk.%d.ffn_gate.weight", layer);
+    snprintf(name_up,   sizeof(name_up),   "blk.%d.ffn_up.weight",   layer);
+    snprintf(name_down, sizeof(name_down), "blk.%d.ffn_down.weight", layer);
+
+    auto it_gate = weight_map->find(name_gate);
+    auto it_up   = weight_map->find(name_up);
+    auto it_down = weight_map->find(name_down);
+
+    if (it_gate == weight_map->end() || it_up == weight_map->end() || it_down == weight_map->end()) {
+        return false;
+    }
+
+    uint64_t block_start = it_gate->second.file_off;
+    uint64_t block_end   = it_gate->second.file_off + it_gate->second.size;
+    if (it_up->second.file_off < block_start) block_start = it_up->second.file_off;
+    if (it_down->second.file_off < block_start) block_start = it_down->second.file_off;
+    uint64_t up_end = it_up->second.file_off + it_up->second.size;
+    uint64_t down_end = it_down->second.file_off + it_down->second.size;
+    if (up_end > block_end) block_end = up_end;
+    if (down_end > block_end) block_end = down_end;
+    size_t block_size = block_end - block_start;
+
+    if (block_size == 0 || block_size > ab->data_size) return false;
+
+    uint8_t* buf = (uint8_t*)ab->buf[buf_idx];
+
+#if HAS_IO_URING
+    if (ab->ring) {
+        struct io_uring_sqe *sqe = io_uring_get_sqe(ab->ring);
+        if (sqe) {
+            io_uring_prep_read_fixed(sqe, ab->fd, buf, block_size,
+                                     (off_t)block_start, buf_idx);
+            io_uring_sqe_set_data64(sqe, (uint64_t)layer);
+            io_uring_submit(ab->ring);
+            struct io_uring_cqe *cqe;
+            int ret = io_uring_wait_cqe(ab->ring, &cqe);
+            if (ret == 0 && cqe->res == (int)block_size) {
+                io_uring_cqe_seen(ab->ring, cqe);
+                return true;
+            }
+            if (cqe) io_uring_cqe_seen(ab->ring, cqe);
+            return false;
+        }
+    }
+#endif
+    ssize_t bytes_read = pread(ab->fd, buf, block_size, (off_t)block_start);
+    return (bytes_read == (ssize_t)block_size);
 }
 
 // Submit async prefetch for layer N (non-blocking)

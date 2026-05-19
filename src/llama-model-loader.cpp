@@ -1181,6 +1181,7 @@ struct ggml_tensor * llama_model_loader::create_tensor(
             // Only do this if the model actually has MTP tensors.
             if (ffn_mode == FFN_ZERO_CPU && has_mtp && is_ffn_in_mtp_layer(tn.str().c_str(), hparams.n_layer)) {
                 route_to_cpu = false;  // ALL MTP predictor tensors stay on GPU
+                LLAMA_LOG_DEBUG("streaming: keeping MTP predictor tensor %s on GPU\n", tn.str().c_str());
             } else if (is_ffn) {
                 route_to_cpu = true;   // All other FFN goes to CPU/SSD
             } else if (is_other) {

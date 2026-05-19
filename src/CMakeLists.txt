@@ -55,6 +55,19 @@ target_compile_features   (llama PRIVATE cxx_std_17) # don't bump
 
 target_link_libraries(llama PUBLIC ggml)
 
+# io_uring support (Linux only)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(LIBURING QUIET liburing)
+    endif()
+    if (LIBURING_FOUND)
+        target_compile_definitions(llama PRIVATE HAS_IO_URING=1)
+        target_link_libraries(llama PRIVATE ${LIBURING_LIBRARIES})
+        target_include_directories(llama PRIVATE ${LIBURING_INCLUDE_DIRS})
+    endif()
+endif()
+
 if (BUILD_SHARED_LIBS)
     set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_compile_definitions(llama PRIVATE LLAMA_BUILD)

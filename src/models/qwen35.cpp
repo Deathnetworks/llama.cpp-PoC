@@ -131,8 +131,10 @@ void llama_model_qwen35::load_arch_tensors(llama_model_loader & ml) {
 
 std::unique_ptr<llm_graph_context> llama_model_qwen35::build_arch_graph(const llm_graph_params & params) const {
     if (params.gtype == LLM_GRAPH_TYPE_DECODER_MTP) {
+        LLAMA_LOG_DEBUG("build_arch_graph: using graph_mtp (shallow MTP graph)\n");
         return std::make_unique<graph_mtp>(*this, params);
     }
+    LLAMA_LOG_DEBUG("build_arch_graph: using full graph (gtype=%d)\n", (int)params.gtype);
     return std::make_unique<graph>(*this, params);
 }
 
